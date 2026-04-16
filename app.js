@@ -1,31 +1,31 @@
 const examples = {
   minutes: {
-    label: "회의록",
+    label: "Minutes",
     sourceName: "meeting-template.hwpx",
-    title: "주간 운영 회의록",
-    toc: ["회의 개요", "주요 논의 사항", "결정 사항", "후속 액션", "공유 일정"],
-    narrative: "팀별 현황과 의사결정 내역을 정리하고 담당자별 액션 아이템을 자동으로 구조화합니다.",
+    title: "Weekly Operations Meeting Minutes",
+    toc: ["Meeting Overview", "Key Discussion Points", "Decisions Made", "Action Items", "Upcoming Schedule"],
+    narrative: "Automatically structures team status updates, decisions, and action items by assignee.",
   },
   "business-plan": {
-    label: "사업계획서",
+    label: "Business Plan",
     sourceName: "business-plan-template.hwpx",
-    title: "신규 AI 문서 자동화 서비스 사업계획서",
-    toc: ["사업 배경", "시장 기회", "서비스 구성", "수익 모델", "추진 일정"],
-    narrative: "사업 목적과 시장성, 서비스 구조, 수익화 전략을 한글 양식에 맞는 사업계획서 형식으로 정돈합니다.",
+    title: "AI Document Automation Service — Business Plan",
+    toc: ["Business Background", "Market Opportunity", "Service Structure", "Revenue Model", "Roadmap"],
+    narrative: "Formats business purpose, market analysis, service structure, and monetization strategy into a clean business plan.",
   },
   proposal: {
-    label: "제안서",
+    label: "Proposal",
     sourceName: "proposal-template.hwpx",
-    title: "공공 문서 자동화 플랫폼 구축 제안서",
-    toc: ["제안 개요", "핵심 기능", "구축 방식", "운영 지원", "예상 효과"],
-    narrative: "제안 목적과 제공 범위, 구축 방식, 운영 계획을 포함한 정형 제안서 구조를 빠르게 생성합니다.",
+    title: "Public Document Automation Platform — Proposal",
+    toc: ["Proposal Overview", "Core Features", "Implementation Approach", "Operational Support", "Expected Outcomes"],
+    narrative: "Quickly generates a structured proposal including objectives, scope, implementation plan, and operations.",
   },
   rfp: {
     label: "RFP",
     sourceName: "rfp-template.hwpx",
-    title: "AI 기반 HWPX 문서 생성 서비스 제안요청서",
-    toc: ["사업 개요", "과업 범위", "기술 요건", "평가 기준", "제출 안내"],
-    narrative: "발주 문서 스타일을 유지하면서 요구사항과 평가 기준 중심의 RFP 형식으로 내용을 치환합니다.",
+    title: "AI-Powered HWPX Document Generation — RFP",
+    toc: ["Project Overview", "Scope of Work", "Technical Requirements", "Evaluation Criteria", "Submission Guidelines"],
+    narrative: "Substitutes content into an RFP format centered on requirements and evaluation criteria while preserving the source document style.",
   },
 };
 
@@ -39,7 +39,7 @@ const state = {
   lastGeneratedFile: "",
 };
 
-// ── 폼 요소 ──
+// ── Form elements ──
 const sourceInput   = document.querySelector("#source-file");
 const sourceNameEl  = document.querySelector("#source-name");
 const titleInput    = document.querySelector("#doc-title");
@@ -52,16 +52,7 @@ const chips         = Array.from(document.querySelectorAll("[data-chip]"));
 const aiButton      = document.querySelector("#ai-fill");
 const demoButton    = document.querySelector("#demo-fill");
 
-// ── 분석 정보 카드 ──
-const summaryMeta    = document.querySelector("#summary-meta");
-const analysisTemplate = document.querySelector("#analysis-template");
-const analysisSize   = document.querySelector("#analysis-size");
-const analysisScope  = document.querySelector("#analysis-scope");
-const stageAnalysis  = document.querySelector("#stage-analysis");
-const stageOutline   = document.querySelector("#stage-outline");
-const stageBuild     = document.querySelector("#stage-build");
-
-// ── 전체 너비 문서 미리보기 ──
+// ── Full-width document preview ──
 const fpKind    = document.querySelector("#fp-kind");
 const fpDate    = document.querySelector("#fp-date");
 const fpSource  = document.querySelector("#fp-source");
@@ -80,28 +71,28 @@ const parseToc = (raw) =>
   raw.split(/\n+/).map((l) => l.trim()).filter(Boolean).slice(0, 5);
 
 const defaultTocFromTitle = (title) => {
-  const seed = title.trim() || "HWPX 문서 자동화";
+  const seed = title.trim() || "HWPX Document Automation";
   return [
-    `${seed} 배경`,
-    "원본 문서 스타일 분석",
-    "내용 치환 및 목차 생성",
-    "검토와 승인 절차",
-    "배포 일정 및 운영",
+    `${seed} — Background`,
+    "Source Document Style Analysis",
+    "Content Substitution & Outline Generation",
+    "Review & Approval Process",
+    "Distribution Schedule & Operations",
   ];
 };
 
 const nowLabel = () =>
-  new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(new Date());
 
 const sentenceForSection = (label, index, title) => {
   const templates = [
-    `${title}의 핵심 맥락과 작성 배경을 원본 서식 흐름에 맞춰 정리합니다.`,
-    `${label} 항목은 기존 양식의 표와 문단 스타일을 유지한 채 요약 중심으로 재작성됩니다.`,
-    `AI가 ${label} 관련 본문 초안을 구성하고 사람이 마지막 검토를 진행합니다.`,
-    `${label}에 포함될 승인 포인트와 검토 체크리스트를 문서 형식에 맞게 반영합니다.`,
-    `${label} 단계까지 포함한 완성본을 HWPX로 다시 묶어 바로 배포 가능한 형태로 만듭니다.`,
+    `Outlines the core context and background behind ${title}, aligned with the original document structure.`,
+    `The "${label}" section is rewritten in summary form while preserving the original table and paragraph styles.`,
+    `AI drafts the body content for "${label}" and a human reviewer completes the final check.`,
+    `Reflects the approval checkpoints and review checklist for "${label}" in the document format.`,
+    `Packages the completed draft including "${label}" back into an .hwpx file ready for distribution.`,
   ];
-  return templates[index] || `${label} 내용을 문서 구조에 맞게 자동 생성합니다.`;
+  return templates[index] || `Auto-generates content for "${label}" to fit the document structure.`;
 };
 
 const render = () => {
@@ -109,25 +100,15 @@ const render = () => {
   const toc = parseToc(tocInput.value);
   const normalizedToc = toc.length ? toc : defaultTocFromTitle(title);
   const source = state.sourceName;
-  const detectedTemplate = source.split(".").pop()?.toLowerCase() === "hwp" ? "legacy-hwp" : "gonmun";
   const currentExample = examples[state.selectedExample] || examples.minutes;
 
-  // 분석 정보 카드
-  summaryMeta.textContent = `${source} 구조를 유지하고 ${normalizedToc.length}개 섹션으로 다시 작성합니다.`;
-  analysisTemplate.textContent = detectedTemplate;
-  analysisSize.textContent = state.fileSizeLabel || "71 KB";
-  analysisScope.textContent = `${23 + normalizedToc.length} text nodes`;
-  stageAnalysis.textContent = `${source}에서 템플릿 타입을 감지하고, 문단 구조를 유지할 텍스트 치환 구간을 계산했습니다.`;
-  stageOutline.textContent = `${normalizedToc.length}개 섹션 기준으로 제목, 요약, 첨부 일정 제목까지 함께 생성합니다.`;
-  stageBuild.textContent = `build → unpack → pack 흐름으로 ${detectedTemplate} 스타일 초안을 다시 .hwpx로 묶습니다.`;
-
-  // 전체 너비 문서 미리보기
+  // Full-width document preview
   fpKind.textContent   = currentExample.label;
   fpDate.textContent   = nowLabel();
-  fpSource.textContent = `원본 양식: ${source}`;
+  fpSource.textContent = `Source template: ${source}`;
   fpTitle.textContent  = title;
 
-  // 목차
+  // Table of contents
   fpToc.innerHTML = "";
   normalizedToc.forEach((item) => {
     const li = document.createElement("li");
@@ -135,7 +116,7 @@ const render = () => {
     fpToc.appendChild(li);
   });
 
-  // 본문 섹션
+  // Body sections
   fpBody.innerHTML = "";
   normalizedToc.forEach((item, index) => {
     const section = document.createElement("div");
@@ -147,12 +128,12 @@ const render = () => {
     fpBody.appendChild(section);
   });
 
-  // 푸터
+  // Footer
   fpFooter.textContent = state.lastGeneratedFile
-    ? `최근 생성 파일: ${state.lastGeneratedFile}`
-    : "실행 전에는 입력값 기준으로 결과물 미리보기만 표시됩니다.";
+    ? `Last generated: ${state.lastGeneratedFile}`
+    : "Preview only — click Generate to create the actual .hwpx file.";
 
-  // 칩 / 예시 버튼 동기화
+  // Chip / example button sync
   chips.forEach((chip) => {
     chip.classList.toggle("is-active", normalizedToc.includes(chip.dataset.chip));
   });
@@ -180,7 +161,7 @@ const applyExample = (key) => {
   state.lastGeneratedFile = "";
   sourceInput.value = "";
   fillForm({ sourceName: example.sourceName, title: example.title, toc: [...example.toc] });
-  runStatus.textContent = `${example.label} 예시를 불러왔습니다. 실행하면 이 유형의 완성본을 생성합니다.`;
+  runStatus.textContent = `"${example.label}" example loaded. Click Generate to create the full document.`;
   downloadLink.classList.add("is-hidden");
 };
 
@@ -192,7 +173,7 @@ sourceInput?.addEventListener("change", (event) => {
   state.fileSizeLabel = formatSize(file.size);
   state.lastGeneratedFile = "";
   sourceNameEl.textContent = file.name;
-  runStatus.textContent = `${file.name} 업로드 준비가 끝났습니다. 실행을 누르면 실제 HWPX를 생성합니다.`;
+  runStatus.textContent = `${file.name} is ready. Click Generate to create the actual HWPX file.`;
   downloadLink.classList.add("is-hidden");
   render();
 });
@@ -218,32 +199,32 @@ runButton?.addEventListener("click", async () => {
   if (state.sourceFile) formData.append("source_file", state.sourceFile);
 
   runButton.disabled = true;
-  runButton.textContent = "생성 중...";
+  runButton.textContent = "Generating…";
   downloadLink.classList.add("is-hidden");
-  runStatus.textContent = "원본 구조를 분석하고 실제 HWPX 파일을 생성하고 있습니다.";
+  runStatus.textContent = "Analyzing source structure and generating the HWPX file…";
 
   try {
     const response = await fetch("/generate.php", { method: "POST", body: formData });
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || "문서 생성에 실패했습니다.");
+      throw new Error(payload.error || "Document generation failed.");
     }
     state.lastGeneratedFile = payload.fileName || "generated.hwpx";
     downloadLink.href = payload.downloadUrl;
     downloadLink.setAttribute("download", state.lastGeneratedFile);
     downloadLink.classList.remove("is-hidden");
-    runStatus.textContent = `${payload.message} ${payload.sourceName} 기준 결과를 바로 내려받을 수 있습니다.`;
+    runStatus.textContent = `${payload.message} Your file based on ${payload.sourceName} is ready to download.`;
     render();
   } catch (error) {
     runStatus.textContent = error.message;
   } finally {
     runButton.disabled = false;
-    runButton.textContent = "실행";
+    runButton.textContent = "Generate";
   }
 });
 
 fillForm({
   sourceName: state.sourceName,
-  title: "AI 기반 한글 문서 자동생성 서비스",
+  title: "AI-Powered HWPX Document Generation Service",
   toc: state.toc,
 });

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI 기반 한글 문서 자동생성 서비스</title>
+    <title>AI-Powered HWPX Document Generation</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="site-header">
         <div>
           <p class="eyebrow">Style-Preserving Document Generation</p>
-          <h1>AI 기반 한글 문서 자동생성 서비스</h1>
+          <h1>AI-Powered HWPX Document Generation</h1>
         </div>
         <div class="status-card">
           <span class="status-dot"></span>
@@ -24,126 +24,127 @@
           <div class="card form-card">
             <div class="card-head">
               <div>
-                <p class="section-label">AI 기반 자동 문서 생성</p>
-                <h2>AI 기반 자동 문서 생성</h2>
+                <p class="section-label">AI Document Generation</p>
+                <h2>AI Document Generation</h2>
               </div>
-              <button id="demo-fill" class="ghost-button" type="button">데모 값 채우기</button>
+              <button id="demo-fill" class="ghost-button" type="button">Load Demo</button>
             </div>
 
             <div class="example-panel">
               <div class="label-row">
-                <span>예시 문서</span>
-                <span class="example-caption">버튼을 누르면 제목과 목차가 즉시 바뀝니다.</span>
+                <span>Document Type</span>
+                <span class="example-caption">Click a type to instantly update the title and outline.</span>
               </div>
               <div class="example-grid">
-                <button class="example-button is-active" type="button" data-example="minutes">회의록</button>
-                <button class="example-button" type="button" data-example="business-plan">사업계획서</button>
-                <button class="example-button" type="button" data-example="proposal">제안서</button>
+                <button class="example-button is-active" type="button" data-example="minutes">Minutes</button>
+                <button class="example-button" type="button" data-example="business-plan">Business Plan</button>
+                <button class="example-button" type="button" data-example="proposal">Proposal</button>
                 <button class="example-button" type="button" data-example="rfp">RFP</button>
               </div>
             </div>
 
             <label class="input-group file-group">
-              <span>원본 HWPX 파일</span>
+              <span>Source HWPX File</span>
               <input id="source-file" type="file" accept=".hwp,.hwpx" />
               <div class="file-meta">
                 <strong id="source-name">document.hwpx</strong>
-                <span>데모에서는 파일명과 템플릿 흐름을 보여주고, 실제 생성은 Python 스크립트로 수행합니다.</span>
+                <span>Demo shows filename and template flow. Actual generation is handled by the Python script.</span>
               </div>
             </label>
 
             <label class="input-group">
-              <span>AI 제목</span>
+              <span>Document Title</span>
               <input
                 id="doc-title"
                 type="text"
-                value="AI 기반 한글 문서 자동생성 서비스"
-                placeholder="예: 원본 공문 스타일을 유지하는 AI 문서 생성 서비스"
+                value="AI-Powered HWPX Document Generation Service"
+                placeholder="e.g. AI document generation preserving original formatting"
               />
             </label>
 
             <label class="input-group">
               <div class="label-row">
-                <span>AI 목차</span>
-                <button id="ai-fill" class="ghost-button small" type="button">AI 목차 제안</button>
+                <span>Table of Contents</span>
+                <button id="ai-fill" class="ghost-button small" type="button">Suggest TOC</button>
               </div>
               <textarea
                 id="doc-toc"
                 rows="7"
-                placeholder="한 줄에 하나씩 입력하세요"
-              >문서 생성 배경
-스타일 분석 방식
-본문 재구성 시나리오
-검토 및 승인 포인트
-후속 일정</textarea>
+                placeholder="One item per line"
+              >Background
+Style Analysis
+Content Reconstruction
+Review &amp; Approval
+Follow-up Schedule</textarea>
             </label>
 
             <div class="chip-row">
-              <span data-chip="문서 생성 배경">문서 생성 배경</span>
-              <span data-chip="스타일 분석 방식">스타일 분석 방식</span>
-              <span data-chip="본문 재구성 시나리오">본문 재구성 시나리오</span>
-              <span data-chip="검토 및 승인 포인트">검토 및 승인 포인트</span>
-              <span data-chip="후속 일정">후속 일정</span>
+              <span data-chip="Background">Background</span>
+              <span data-chip="Style Analysis">Style Analysis</span>
+              <span data-chip="Content Reconstruction">Content Reconstruction</span>
+              <span data-chip="Review &amp; Approval">Review &amp; Approval</span>
+              <span data-chip="Follow-up Schedule">Follow-up Schedule</span>
             </div>
 
             <div class="action-row">
-              <button id="run-demo" class="primary-button" type="button">실행</button>
-              <a id="download-link" class="download-link is-hidden" href="#" download>완성된 파일 다운로드</a>
+              <button id="run-demo" class="primary-button" type="button">Generate</button>
+              <a id="download-link" class="download-link is-hidden" href="#" download>Download Generated File</a>
             </div>
             <p id="run-status" class="run-status">
-              지금 상태에서는 미리보기만 바뀝니다. 실행 버튼을 누르면 서버에서 실제 `.hwpx` 파일을 생성합니다.
+              Preview updates as you type. Click Generate to create the actual <code>.hwpx</code> file on the server.
             </p>
           </div>
 
-          <div class="card preview-card">
-            <p class="section-label">분석 정보</p>
-            <p id="summary-meta" class="summary-meta-line"></p>
-            <div class="metric-grid">
-              <article class="metric-card">
-                <span>감지된 템플릿</span>
-                <strong id="analysis-template">gonmun</strong>
-              </article>
-              <article class="metric-card">
-                <span>파일 크기</span>
-                <strong id="analysis-size">71 KB</strong>
-              </article>
-              <article class="metric-card">
-                <span>치환 범위</span>
-                <strong id="analysis-scope">28 nodes</strong>
-              </article>
-            </div>
-            <div class="stage-panel">
-              <div class="stage-row">
-                <span class="stage-dot is-active"></span>
-                <div>
-                  <strong>원본 구조 분석</strong>
-                  <p id="stage-analysis">샘플 템플릿 기준으로 section0.xml 텍스트 노드를 읽을 준비가 되었습니다.</p>
-                </div>
-              </div>
-              <div class="stage-row">
-                <span class="stage-dot is-active"></span>
-                <div>
-                  <strong>AI 목차 생성</strong>
-                  <p id="stage-outline">현재 입력된 제목과 목차로 5개 섹션 초안을 만들 수 있습니다.</p>
-                </div>
-              </div>
-              <div class="stage-row">
-                <span class="stage-dot is-active"></span>
-                <div>
-                  <strong>HWPX 재생성</strong>
-                  <p id="stage-build">CLI 스크립트가 Preview와 XML 메타데이터까지 함께 갱신합니다.</p>
-                </div>
-              </div>
+          <div class="card examples-card">
+            <p class="section-label">Output Examples</p>
+            <p class="examples-desc">Click to fill the form with this document type.</p>
+            <div class="examples-list" id="examples-list">
+              <button class="example-preview is-active" type="button" data-example="minutes">
+                <span class="ep-badge">Minutes</span>
+                <strong class="ep-title">Weekly Operations Meeting Minutes</strong>
+                <ol class="ep-toc">
+                  <li>Meeting Overview</li>
+                  <li>Key Discussion Points</li>
+                  <li>Decisions Made</li>
+                </ol>
+              </button>
+              <button class="example-preview" type="button" data-example="business-plan">
+                <span class="ep-badge">Business Plan</span>
+                <strong class="ep-title">AI Document Automation Service — Business Plan</strong>
+                <ol class="ep-toc">
+                  <li>Business Background</li>
+                  <li>Market Opportunity</li>
+                  <li>Service Structure</li>
+                </ol>
+              </button>
+              <button class="example-preview" type="button" data-example="proposal">
+                <span class="ep-badge">Proposal</span>
+                <strong class="ep-title">Public Document Automation Platform — Proposal</strong>
+                <ol class="ep-toc">
+                  <li>Proposal Overview</li>
+                  <li>Core Features</li>
+                  <li>Implementation Approach</li>
+                </ol>
+              </button>
+              <button class="example-preview" type="button" data-example="rfp">
+                <span class="ep-badge">RFP</span>
+                <strong class="ep-title">AI-Powered HWPX Document Generation — RFP</strong>
+                <ol class="ep-toc">
+                  <li>Project Overview</li>
+                  <li>Scope of Work</li>
+                  <li>Technical Requirements</li>
+                </ol>
+              </button>
             </div>
           </div>
         </section>
 
-        <!-- 전체 너비 문서 미리보기 -->
+        <!-- Full-width document preview -->
         <section class="doc-fullview">
           <div class="doc-fullview-header">
-            <p class="section-label">문서 미리보기</p>
+            <p class="section-label">Document Preview</p>
             <div class="doc-meta-row">
-              <span id="fp-kind" class="document-badge">회의록</span>
+              <span id="fp-kind" class="document-badge">Minutes</span>
               <span id="fp-date" class="doc-date-label"></span>
               <span id="fp-source" class="doc-source-label"></span>
             </div>
@@ -153,7 +154,7 @@
               <h2 id="fp-title" class="doc-main-title"></h2>
               <hr class="doc-rule" />
               <div class="doc-toc-block">
-                <p class="doc-block-label">목 차</p>
+                <p class="doc-block-label">Contents</p>
                 <ol id="fp-toc" class="doc-toc-list"></ol>
               </div>
               <hr class="doc-rule" />

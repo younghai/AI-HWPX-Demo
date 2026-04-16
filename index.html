@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 기반 한글 문서 자동생성 서비스</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <div>
+          <p class="eyebrow">Style-Preserving Document Generation</p>
+          <h1>AI 기반 한글 문서 자동생성 서비스</h1>
+        </div>
+        <div class="status-card">
+          <span class="status-dot"></span>
+          <span>Template-first workflow</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="hero card">
+          <div class="hero-copy">
+            <p class="section-label">핵심 프로세스</p>
+            <h2>AI 기반 자동 문서 생성</h2>
+            <p>
+              한글 문서를 입력하고, 제목과 목차를 정해주면 AI 가 문서 작성
+            </p>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <div class="card form-card">
+            <div class="card-head">
+              <div>
+                <p class="section-label">AI 기반 자동 문서 생성</p>
+                <h2>AI 기반 자동 문서 생성</h2>
+              </div>
+              <button id="demo-fill" class="ghost-button" type="button">데모 값 채우기</button>
+            </div>
+
+            <div class="example-panel">
+              <div class="label-row">
+                <span>예시 문서</span>
+                <span class="example-caption">버튼을 누르면 제목과 목차가 즉시 바뀝니다.</span>
+              </div>
+              <div class="example-grid">
+                <button class="example-button is-active" type="button" data-example="minutes">회의록</button>
+                <button class="example-button" type="button" data-example="business-plan">사업계획서</button>
+                <button class="example-button" type="button" data-example="proposal">제안서</button>
+                <button class="example-button" type="button" data-example="rfp">RFP</button>
+              </div>
+            </div>
+
+            <label class="input-group file-group">
+              <span>원본 HWPX 파일</span>
+              <input id="source-file" type="file" accept=".hwp,.hwpx" />
+              <div class="file-meta">
+                <strong id="source-name">document.hwpx</strong>
+                <span>데모에서는 파일명과 템플릿 흐름을 보여주고, 실제 생성은 Python 스크립트로 수행합니다.</span>
+              </div>
+            </label>
+
+            <label class="input-group">
+              <span>AI 제목</span>
+              <input
+                id="doc-title"
+                type="text"
+                value="AI 기반 한글 문서 자동생성 서비스"
+                placeholder="예: 원본 공문 스타일을 유지하는 AI 문서 생성 서비스"
+              />
+            </label>
+
+            <label class="input-group">
+              <div class="label-row">
+                <span>AI 목차</span>
+                <button id="ai-fill" class="ghost-button small" type="button">AI 목차 제안</button>
+              </div>
+              <textarea
+                id="doc-toc"
+                rows="7"
+                placeholder="한 줄에 하나씩 입력하세요"
+              >문서 생성 배경
+스타일 분석 방식
+본문 재구성 시나리오
+검토 및 승인 포인트
+후속 일정</textarea>
+            </label>
+
+            <div class="chip-row">
+              <span data-chip="문서 생성 배경">문서 생성 배경</span>
+              <span data-chip="스타일 분석 방식">스타일 분석 방식</span>
+              <span data-chip="본문 재구성 시나리오">본문 재구성 시나리오</span>
+              <span data-chip="검토 및 승인 포인트">검토 및 승인 포인트</span>
+              <span data-chip="후속 일정">후속 일정</span>
+            </div>
+
+            <div class="action-row">
+              <button id="run-demo" class="primary-button" type="button">실행</button>
+              <a id="download-link" class="download-link is-hidden" href="#" download>완성된 파일 다운로드</a>
+            </div>
+            <p id="run-status" class="run-status">
+              지금 상태에서는 미리보기만 바뀝니다. 실행 버튼을 누르면 서버에서 실제 `.hwpx` 파일을 생성합니다.
+            </p>
+          </div>
+
+          <div class="card preview-card">
+            <p class="section-label">Output Preview</p>
+            <h2 id="summary-title">AI 기반 한글 문서 자동생성 서비스</h2>
+            <p id="summary-meta"></p>
+            <p id="summary-narrative" class="narrative"></p>
+            <div class="metric-grid">
+              <article class="metric-card">
+                <span>Detected template</span>
+                <strong id="analysis-template">gonmun</strong>
+              </article>
+              <article class="metric-card">
+                <span>Source size</span>
+                <strong id="analysis-size">71 KB</strong>
+              </article>
+              <article class="metric-card">
+                <span>Replacement scope</span>
+                <strong id="analysis-scope">28 text nodes</strong>
+              </article>
+            </div>
+            <ol id="summary-sections" class="section-list"></ol>
+            <div class="stage-panel">
+              <div class="stage-row">
+                <span class="stage-dot is-active"></span>
+                <div>
+                  <strong>원본 구조 분석</strong>
+                  <p id="stage-analysis">샘플 템플릿 기준으로 section0.xml 텍스트 노드를 읽을 준비가 되었습니다.</p>
+                </div>
+              </div>
+              <div class="stage-row">
+                <span class="stage-dot is-active"></span>
+                <div>
+                  <strong>AI 목차 생성</strong>
+                  <p id="stage-outline">현재 입력된 제목과 목차로 5개 섹션 초안을 만들 수 있습니다.</p>
+                </div>
+              </div>
+              <div class="stage-row">
+                <span class="stage-dot is-active"></span>
+                <div>
+                  <strong>HWPX 재생성</strong>
+                  <p id="stage-build">CLI 스크립트가 Preview와 XML 메타데이터까지 함께 갱신합니다.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="document-preview">
+              <div class="document-sheet">
+                <div class="document-head">
+                  <span id="preview-kind" class="document-badge">회의록</span>
+                  <span id="preview-date" class="document-date"></span>
+                </div>
+                <h3 id="preview-title" class="document-title">주간 운영 회의록</h3>
+                <p id="preview-source" class="document-source">원본 양식: meeting-template.hwpx</p>
+
+                <div class="document-section">
+                  <strong>목차</strong>
+                  <ol id="preview-outline" class="document-outline"></ol>
+                </div>
+
+                <div class="document-section">
+                  <strong>본문 미리보기</strong>
+                  <div id="preview-body" class="document-body"></div>
+                </div>
+
+                <div class="document-foot">
+                  <span id="preview-footer">실행 전에는 입력값 기준으로 결과물 미리보기만 표시됩니다.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

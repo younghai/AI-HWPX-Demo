@@ -1,0 +1,35 @@
+# Generated HWPX output files
+generated/*.hwpx
+
+# Uploaded temp files
+runtime/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# OMC / Claude Code internal
+.omc/
+.omx/
+.claude/

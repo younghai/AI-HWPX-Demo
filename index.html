@@ -106,25 +106,22 @@
           </div>
 
           <div class="card preview-card">
-            <p class="section-label">Output Preview</p>
-            <h2 id="summary-title">AI 기반 한글 문서 자동생성 서비스</h2>
-            <p id="summary-meta"></p>
-            <p id="summary-narrative" class="narrative"></p>
+            <p class="section-label">분석 정보</p>
+            <p id="summary-meta" class="summary-meta-line"></p>
             <div class="metric-grid">
               <article class="metric-card">
-                <span>Detected template</span>
+                <span>감지된 템플릿</span>
                 <strong id="analysis-template">gonmun</strong>
               </article>
               <article class="metric-card">
-                <span>Source size</span>
+                <span>파일 크기</span>
                 <strong id="analysis-size">71 KB</strong>
               </article>
               <article class="metric-card">
-                <span>Replacement scope</span>
-                <strong id="analysis-scope">28 text nodes</strong>
+                <span>치환 범위</span>
+                <strong id="analysis-scope">28 nodes</strong>
               </article>
             </div>
-            <ol id="summary-sections" class="section-list"></ol>
             <div class="stage-panel">
               <div class="stage-row">
                 <span class="stage-dot is-active"></span>
@@ -148,30 +145,30 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div class="document-preview">
-              <div class="document-sheet">
-                <div class="document-head">
-                  <span id="preview-kind" class="document-badge">회의록</span>
-                  <span id="preview-date" class="document-date"></span>
-                </div>
-                <h3 id="preview-title" class="document-title">주간 운영 회의록</h3>
-                <p id="preview-source" class="document-source">원본 양식: meeting-template.hwpx</p>
-
-                <div class="document-section">
-                  <strong>목차</strong>
-                  <ol id="preview-outline" class="document-outline"></ol>
-                </div>
-
-                <div class="document-section">
-                  <strong>본문 미리보기</strong>
-                  <div id="preview-body" class="document-body"></div>
-                </div>
-
-                <div class="document-foot">
-                  <span id="preview-footer">실행 전에는 입력값 기준으로 결과물 미리보기만 표시됩니다.</span>
-                </div>
+        <!-- 전체 너비 문서 미리보기 -->
+        <section class="doc-fullview">
+          <div class="doc-fullview-header">
+            <p class="section-label">문서 미리보기</p>
+            <div class="doc-meta-row">
+              <span id="fp-kind" class="document-badge">회의록</span>
+              <span id="fp-date" class="doc-date-label"></span>
+              <span id="fp-source" class="doc-source-label"></span>
+            </div>
+          </div>
+          <div class="doc-page">
+            <div class="doc-page-inner">
+              <h2 id="fp-title" class="doc-main-title"></h2>
+              <hr class="doc-rule" />
+              <div class="doc-toc-block">
+                <p class="doc-block-label">목 차</p>
+                <ol id="fp-toc" class="doc-toc-list"></ol>
               </div>
+              <hr class="doc-rule" />
+              <div id="fp-body" class="doc-body-sections"></div>
+              <p id="fp-footer" class="doc-page-footer"></p>
             </div>
           </div>
         </section>

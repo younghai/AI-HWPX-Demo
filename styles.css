@@ -521,6 +521,147 @@ textarea:focus {
   font-size: 0.92rem;
 }
 
+/* ── 전체 너비 문서 미리보기 ── */
+.doc-fullview {
+  margin-top: 32px;
+  padding-bottom: 48px;
+}
+
+.doc-fullview-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.doc-fullview-header .section-label {
+  margin: 0;
+}
+
+.doc-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.doc-date-label,
+.doc-source-label {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.doc-page {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(31, 26, 22, 0.08);
+  box-shadow:
+    0 2px 8px rgba(31, 26, 22, 0.06),
+    0 16px 48px rgba(31, 26, 22, 0.08);
+  overflow: hidden;
+}
+
+.doc-page-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 64px 48px;
+}
+
+.doc-main-title {
+  font-family: "Iropke Batang", "Noto Serif KR", Georgia, serif;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0 0 28px;
+}
+
+.doc-rule {
+  border: none;
+  border-top: 1px solid rgba(31, 26, 22, 0.1);
+  margin: 0 0 24px;
+}
+
+.doc-block-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--highlight);
+  margin: 0 0 14px;
+}
+
+.doc-toc-block {
+  margin-bottom: 28px;
+}
+
+.doc-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  counter-reset: toc-counter;
+}
+
+.doc-toc-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.97rem;
+  counter-increment: toc-counter;
+}
+
+.doc-toc-list li::before {
+  content: counter(toc-counter, decimal-leading-zero);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--highlight);
+  min-width: 24px;
+}
+
+.doc-body-sections {
+  display: grid;
+  gap: 32px;
+}
+
+.doc-body-section {
+  display: grid;
+  gap: 10px;
+}
+
+.doc-body-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(13, 106, 97, 0.18);
+}
+
+.doc-body-section-content {
+  color: var(--muted);
+  font-size: 0.93rem;
+  line-height: 1.75;
+}
+
+.doc-page-footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(31, 26, 22, 0.12);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.summary-meta-line {
+  color: var(--muted);
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 980px) {
   .hero,
   .workspace,

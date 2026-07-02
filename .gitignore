@@ -1,0 +1,36 @@
+# Node
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build artifacts
+client/dist/
+
+# Generated HWPX output (per-run, do not track)
+generated/
+
+# Runtime / session state (OMC, Claude Code local settings, logs)
+.omc/
+**/.omc/
+.claude/settings.local.json
+*.log
+
+# Secrets — use server/.env.example as template
+.env
+server/.env
+.env.local
+.env.*.local
+
+# Python virtual environment
+.venv/
+
+# OS noise
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# polaris-dvc 빌드 바이너리 (1.3MB, setup-polaris-dvc.sh 로 재생성)
+tools/bin/

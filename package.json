@@ -1,0 +1,22 @@
+{
+  "name": "ai-hwp",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"pnpm -C server dev\" \"pnpm -C client dev\"",
+    "dev:auto": "concurrently \"PORT=8793 CLIENT_ORIGIN=http://127.0.0.1:5193 OAUTH_REDIRECT_BASE=http://127.0.0.1:8793 pnpm -C server dev\" \"VITE_SERVER_PORT=8793 VITE_AUTO_LOGIN=true pnpm -C client dev -- --port 5193\"",
+    "dev:client": "pnpm -C client dev",
+    "dev:server": "pnpm -C server dev",
+    "build": "pnpm -C client build",
+    "postinstall": "bash scripts/setup-rhwp-symlink.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

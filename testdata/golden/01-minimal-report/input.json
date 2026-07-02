@@ -1,0 +1,27 @@
+{
+  "name": "01-minimal-report",
+  "description": "AI가 3섹션을 반환한 표준 시나리오. 모든 마커가 정확히 1회씩 등장하고 검증 통과해야 한다.",
+  "request": {
+    "title": "GOLDEN_01_TITLE",
+    "toc": ["배경 및 목적", "현황 분석", "핵심 제안"],
+    "sections": [
+      {"heading": "배경 및 목적", "body": "GOLDEN_01_A 첫 번째 배경 문장입니다. GOLDEN_01_B 두 번째 보충 설명."},
+      {"heading": "현황 분석", "body": "GOLDEN_01_C 현황 분석 내용."},
+      {"heading": "핵심 제안", "body": "GOLDEN_01_D 핵심 제안 요약."}
+    ],
+    "diagrams": [],
+    "sourceMode": "hwpx-template",
+    "templateRelPath": "templates/gonmun.hwpx"
+  },
+  "expected": {
+    "markers_present": ["GOLDEN_01_TITLE", "GOLDEN_01_A", "GOLDEN_01_B", "GOLDEN_01_C", "GOLDEN_01_D"],
+    "markers_each_exact_count": 1,
+    "template_leaks_forbidden": [
+      "수요조사 : 00억원",
+      "시스템개발 : 00억원",
+      "OO부서의 협력",
+      "환율 문제"
+    ],
+    "validation_error_count_max": 0
+  }
+}

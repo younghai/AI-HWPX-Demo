@@ -1,0 +1,27 @@
+{
+  "name": "02-multi-section-preservation",
+  "description": "AI가 템플릿 섹션 수보다 적게 반환한 경우에도 남은 섹션은 비워져야 한다 (P0 fix). 과거 '시장 내 경쟁력 강화...' 등 원본 샘플 문장 반복 버그의 회귀 테스트.",
+  "request": {
+    "title": "GOLDEN_02_TITLE",
+    "toc": ["배경 및 목적", "현황 분석"],
+    "sections": [
+      {"heading": "배경 및 목적", "body": "GOLDEN_02_A 첫 배경. GOLDEN_02_B 두 번째 배경."},
+      {"heading": "현황 분석", "body": "GOLDEN_02_C 현황 분석."}
+    ],
+    "diagrams": [],
+    "sourceMode": "hwpx-template",
+    "templateRelPath": "templates/gonmun.hwpx"
+  },
+  "expected": {
+    "markers_present": ["GOLDEN_02_A", "GOLDEN_02_B", "GOLDEN_02_C", "GOLDEN_02_TITLE"],
+    "markers_each_exact_count": 1,
+    "template_leaks_forbidden": [
+      "수요조사 : 00억원",
+      "시스템개발 : 00억원",
+      "OO부서의 협력",
+      "환율 문제",
+      "OOOO"
+    ],
+    "validation_error_count_max": 0
+  }
+}

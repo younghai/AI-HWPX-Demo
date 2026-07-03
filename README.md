@@ -32,6 +32,19 @@ AI API 키는 두 가지 방법으로 설정:
 
 > 💡 API 키 없이도 실행·업로드·미리보기·HWPX 내보내기는 동작합니다. AI 초안 생성만 키가 필요합니다.
 
+### 🔐 외부 배포 (protected 모드)
+
+로컬 기본값은 `AUTH_MODE=local`(인증 없음, 단일 사용자용)입니다. 외부/팀에 공개하려면 `server/.env`에서 아래를 설정하세요 (자세한 항목은 [`server/.env.example`](server/.env.example) 참고):
+
+```bash
+AUTH_MODE=protected          # 상태 변경·비용·다운로드 라우트에 Google 로그인 세션 강제
+NODE_ENV=production          # mock 로그인 비활성 + 쿠키 secure(HTTPS)
+GOOGLE_CLIENT_ID=...         # protected 모드는 Google OAuth 필요
+GOOGLE_CLIENT_SECRET=...
+```
+
+protected 모드에서는 인증 게이트·rate limit·helmet·산출물 격리·zip/XXE 방어가 활성화됩니다. HTTPS 프록시 뒤에서 운영하세요.
+
 ## 🎨 기능
 
 - **HWP/HWPX 업로드** — 드래그앤드롭 + 클릭, 파일 크기/페이지 수/형식 표시 (extension + MIME + magic bytes 3중 검증)

@@ -10,6 +10,14 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+# Parse untrusted template XML with defusedxml to block entity-expansion (billion
+# laughs) / external-entity attacks. Serialization still uses the standard ET.
+# Falls back to stdlib ET if defusedxml is unavailable (review PY-07).
+try:
+    from defusedxml.ElementTree import parse as _safe_parse
+except ImportError:
+    _safe_parse = ET.parse
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 OFFICE_DIR = SCRIPT_DIR / "office"
 REPO_ROOT = SCRIPT_DIR.parent
@@ -118,7 +126,7 @@ def detect_heading_style_ids(header_xml: Path) -> frozenset[str]:
     """header.xml 의 스타일 이름을 분석해 섹션 헤딩에 해당하는 styleIDRef 집합을 반환합니다.
     인식 불가 시 {'1'} 을 기본값으로 반환합니다."""
     try:
-        tree = ET.parse(header_xml)
+        tree = _safe_parse(header_xml)
         root = tree.getroot()
         ids: set[str] = set()
         for style in root.findall(f".//{{{HH}}}style"):
@@ -248,7 +256,7 @@ def apply_smart_replacements(
     heading_ids = detect_heading_style_ids(header_path)
     now_label = datetime.now().strftime("%Y.%m.%d")
 
-    tree = ET.parse(section_path)
+    tree = _safe_parse(section_path)
     root = tree.getroot()
 
     # Build parent map for paragraph insertion later
@@ -374,7 +382,7 @@ def update_preview(preview_path: Path, title: str, toc: list[str], source_docume
 
 
 def update_metadata(content_hpf: Path, title: str) -> None:
-    tree = ET.parse(content_hpf)
+    tree = _safe_parse(content_hpf)
     root = tree.getroot()
     title_node = root.find(".//opf:title", NAMESPACES)
     if title_node is not None:
@@ -409,13 +417,13 @@ def embed_diagrams(
     bin_dir      = working_dir / "BinData"
     bin_dir.mkdir(exist_ok=True)
 
-    tree = ET.parse(section_path)
+    tree = _safe_parse(section_path)
     root = tree.getroot()
 
     # Collect all paragraphs in document order
     all_paras = list(root.iter(f"{{{HP}}}p"))
 
-    hpf_tree = ET.parse(content_hpf)
+    hpf_tree = _safe_parse(content_hpf)
     hpf_root = hpf_tree.getroot()
     manifest_ns = "http://www.idpf.org/2007/opf/"
 

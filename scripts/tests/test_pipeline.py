@@ -99,13 +99,48 @@ def test_pack_hwpx_atomic_no_tmp_leftover(tmp_path: Path):
     assert not list(tmp_path.glob(".out.hwpx*.tmp"))  # temp cleaned up
 
 
-# ── PY-05 (partial): unpack rejects path-traversal entries ───────────────────
+# ── PY-05: unpack rejects hostile archives (traversal + zip bomb) ────────────
 def test_unpack_rejects_path_traversal(tmp_path: Path):
     evil = tmp_path / "evil.zip"
     with zipfile.ZipFile(evil, "w") as zf:
         zf.writestr("../escape.txt", "pwned")
     with pytest.raises(ValueError):
         hwpx_utils.unpack_hwpx(evil, tmp_path / "dest")
+
+
+def test_unpack_rejects_too_many_entries(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(hwpx_utils, "MAX_ZIP_ENTRIES", 3)
+    bomb = tmp_path / "many.zip"
+    with zipfile.ZipFile(bomb, "w") as zf:
+        for i in range(5):
+            zf.writestr(f"f{i}.txt", "x")
+    with pytest.raises(ValueError):
+        hwpx_utils.unpack_hwpx(bomb, tmp_path / "dest")
+
+
+def test_unpack_rejects_oversize(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(hwpx_utils, "MAX_UNCOMPRESSED_BYTES", 100)
+    bomb = tmp_path / "big.zip"
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("big.txt", "A" * 5000)  # compresses tiny, expands past the cap
+    with pytest.raises(ValueError):
+        hwpx_utils.unpack_hwpx(bomb, tmp_path / "dest")
+
+
+# ── PY-07: XXE / entity-expansion parsing is blocked by defusedxml ───────────
+def test_safe_parse_blocks_entity_expansion(tmp_path: Path):
+    pytest.importorskip("defusedxml")
+    billion = tmp_path / "lol.xml"
+    billion.write_text(
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE lolz [<!ENTITY lol "lol">'
+        '<!ENTITY lol2 "&lol;&lol;&lol;">]>'
+        '<root>&lol2;</root>',
+        encoding="utf-8",
+    )
+    from defusedxml.common import EntitiesForbidden
+    with pytest.raises(EntitiesForbidden):
+        build_hwpx._safe_parse(str(billion))
 
 
 # ── R5: _normalize_paragraph collapses to a single text run + single lineseg ──

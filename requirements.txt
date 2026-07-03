@@ -1,1 +1,2 @@
 cairosvg>=2.8
+defusedxml>=0.7

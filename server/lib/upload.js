@@ -1,6 +1,7 @@
 import { createHttpError } from './errors.js'
 
-const HWPX_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04])
+const HWPX_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04])              // "PK\x03\x04" (zip)
+const HWP_OLE_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])  // OLE compound doc
 const ALLOWED_UPLOAD_MIME = new Set([
   'application/octet-stream',
   'application/zip',
@@ -44,6 +45,13 @@ export function assertValidUpload(file) {
     const head = file.buffer?.subarray(0, 4)
     if (!head || !head.equals(HWPX_MAGIC)) {
       throw createHttpError('HWPX 파일 시그니처가 올바르지 않습니다.', 415)
+    }
+  } else if (lowerName.endsWith('.hwp')) {
+    // Legacy .hwp is an OLE compound document — validate its magic so arbitrary
+    // binaries can't ride in on the .hwp extension (review BE-14).
+    const head = file.buffer?.subarray(0, 8)
+    if (!head || !head.equals(HWP_OLE_MAGIC)) {
+      throw createHttpError('HWP 파일 시그니처가 올바르지 않습니다.', 415)
     }
   }
 }

@@ -24,7 +24,17 @@ export function parseEnvFile(text) {
   return map
 }
 
-export async function writeEnvFile(overrides = {}) {
+// Serialize .env writes: read→merge→write is not atomic, so concurrent callers
+// (e.g. /api/settings + an OAuth callback) could lose updates or half-write the
+// file. A promise chain guarantees one write runs at a time (review BE-03).
+let writeQueue = Promise.resolve()
+
+export function writeEnvFile(overrides = {}) {
+  writeQueue = writeQueue.then(() => writeEnvFileUnsafe(overrides), () => writeEnvFileUnsafe(overrides))
+  return writeQueue
+}
+
+async function writeEnvFileUnsafe(overrides = {}) {
   const envPath = path.join(serverDir, '.env')
   let existing = ''
   try {
@@ -61,5 +71,9 @@ export async function writeEnvFile(overrides = {}) {
     extras.forEach((k) => lines.push(formatLine(k)))
   }
   lines.push('')
-  await fs.writeFile(envPath, lines.join('\n'), 'utf-8')
+  // Atomic replace: write to a temp file then rename, so a crash mid-write can
+  // never leave a truncated/corrupt .env (review BE-03).
+  const tmpPath = `${envPath}.${process.pid}.tmp`
+  await fs.writeFile(tmpPath, lines.join('\n'), { encoding: 'utf-8', mode: 0o600 })
+  await fs.rename(tmpPath, envPath)
 }

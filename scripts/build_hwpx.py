@@ -94,6 +94,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--toc", help="Pipe-separated or newline-separated table of contents")
     parser.add_argument("--source-document", default="document.hwpx", help="Name of the source document")
     parser.add_argument("--sections-json", help="JSON file with AI-generated sections [{heading, body}, ...]")
+    parser.add_argument("--doc-date", help="Document date (YYYY.MM.DD). Defaults to today; pass a fixed value for deterministic output/tests.")
     return parser.parse_args()
 
 
@@ -234,6 +235,7 @@ def apply_smart_replacements(
     toc: list[str],
     source_document: str,
     sections_body: dict[str, str] | None = None,
+    doc_date: str | None = None,
 ) -> None:
     """Two-pass replacement that maps AI-generated content to template
     sections by INDEX (not name lookup), then normalizes each paragraph
@@ -242,7 +244,8 @@ def apply_smart_replacements(
     section_path = working_dir / "Contents" / "section0.xml"
 
     heading_ids = detect_heading_style_ids(header_path)
-    now_label = datetime.now().strftime("%Y.%m.%d")
+    # Deterministic when --doc-date is supplied; otherwise today (review PY-P2).
+    now_label = doc_date or datetime.now().strftime("%Y.%m.%d")
 
     tree = _safe_parse(section_path)
     root = tree.getroot()
@@ -580,7 +583,7 @@ def run() -> Path:
         working_dir = Path(temp_dir)
         unpack_hwpx(template_path, working_dir)
 
-        apply_smart_replacements(working_dir, title, toc, source_document, sections_body)
+        apply_smart_replacements(working_dir, title, toc, source_document, sections_body, doc_date=args.doc_date)
         if diagrams:
             embed_diagrams(working_dir, diagrams)
         update_preview(working_dir / "Preview" / "PrvText.txt", title, toc, source_document)

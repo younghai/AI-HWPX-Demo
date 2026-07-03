@@ -204,3 +204,27 @@ def test_build_parity_fills_bodies_no_placeholder_leak(tmp_path: Path):
     assert "MARKER_BETA" in section_xml
     # R6: template's own sample sentence must not leak through (no placeholder bleed)
     assert "시장 내 경쟁력" not in section_xml
+
+
+# ── PY-P2: --doc-date makes output deterministic ─────────────────────────────
+@pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
+def test_doc_date_is_deterministic(tmp_path: Path):
+    import subprocess
+    import sys as _sys
+
+    def build(out):
+        r = subprocess.run(
+            [_sys.executable, str(REPO_ROOT / "scripts" / "build_hwpx.py"),
+             "--template", "gonmun", "--output", str(out),
+             "--title", "결정성", "--toc", "개요", "--doc-date", "2026.01.01"],
+            capture_output=True, text=True,
+        )
+        assert r.returncode == 0, r.stdout + r.stderr
+        with zipfile.ZipFile(out) as zf:
+            return zf.read("Contents/section0.xml").decode("utf-8")
+
+    a = build(tmp_path / "a.hwpx")
+    b = build(tmp_path / "b.hwpx")
+    # Same fixed date → identical section content (no now()-driven drift).
+    assert a == b
+    assert "2026.01.01" in a

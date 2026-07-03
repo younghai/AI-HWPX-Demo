@@ -38,6 +38,20 @@ for opt in scripts/clone_form.py scripts/fix_namespaces.py; do
 done
 
 echo ""
+echo "=== Python regression suite (pytest) ==="
+if [ -d "$REPO_ROOT/.venv" ]; then
+  PYTEST_BIN="$REPO_ROOT/.venv/bin/python3 -m pytest"
+else
+  PYTEST_BIN="python3 -m pytest"
+fi
+if $PYTEST_BIN scripts/tests -q > /tmp/ai-hwp-pytest.log 2>&1; then
+  pass "$(tail -1 /tmp/ai-hwp-pytest.log)"
+else
+  fail "pytest 실패 — 로그: /tmp/ai-hwp-pytest.log"
+  tail -20 /tmp/ai-hwp-pytest.log | sed 's/^/      /'
+fi
+
+echo ""
 echo "=== Server module syntax ==="
 CNT=0; BAD=0
 for f in server/index.js server/lib/*.js server/services/*.js server/routes/*.js; do

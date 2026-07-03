@@ -527,21 +527,45 @@ def embed_diagrams(
     hpf_tree.write(content_hpf, encoding="utf-8", xml_declaration=True)
 
 
+class SectionsParseError(Exception):
+    """Raised when a sections JSON file was provided but could not be parsed.
+
+    Distinct from "no file provided" so the caller can surface a real failure
+    instead of silently generating a document with empty bodies.
+    """
+
+
 def load_sections_body(json_path: str | None) -> tuple[dict[str, str] | None, list[dict]]:
-    """Returns (sections_body_dict, diagrams_list)."""
+    """Returns (sections_body_dict, diagrams_list).
+
+    Headings and bodies are NFC-normalized so lookups against the NFC-normalized
+    TOC (see main()) succeed even when the source JSON carries NFD text — which
+    happens on macOS, where filenames and pasted text are NFD by default. Without
+    this, an NFD heading would fail the toc[i] lookup and the section body would
+    be cleared to empty. See CLAUDE.md R6 / review PY-02.
+    """
     if not json_path:
         return None, []
     try:
         data = json.loads(Path(json_path).read_text(encoding="utf-8"))
-        sections = {s["heading"]: s["body"] for s in data if "heading" in s and "body" in s}
-        diagrams = [d for d in data if d.get("_diagram") is True]
-        return sections, diagrams
-    except Exception as exc:
-        logging.warning("load_sections_body failed: %s", exc)
-        return None, []
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SectionsParseError(f"sections JSON을 읽을 수 없습니다: {exc}") from exc
+    if not isinstance(data, list):
+        raise SectionsParseError("sections JSON 최상위가 배열이 아닙니다.")
+    sections = {
+        unicodedata.normalize("NFC", s["heading"]): unicodedata.normalize("NFC", s["body"])
+        for s in data
+        if isinstance(s, dict) and "heading" in s and "body" in s
+    }
+    diagrams = [d for d in data if isinstance(d, dict) and d.get("_diagram") is True]
+    return sections, diagrams
 
 
-def main() -> None:
+class TemplateNotFoundError(Exception):
+    """Raised when the requested template file does not exist."""
+
+
+def run() -> Path:
     args = parse_args()
     template = TEMPLATES[args.template]
     template_path = Path(args.template_file).expanduser().resolve() if args.template_file else template["path"]
@@ -553,7 +577,8 @@ def main() -> None:
     sections_body, diagrams = load_sections_body(args.sections_json)
 
     if not template_path.exists():
-        raise SystemExit(f"Template file not found: {template_path}")
+        # Surface only the basename — never leak absolute server paths to users.
+        raise TemplateNotFoundError(f"템플릿 파일을 찾을 수 없습니다: {template_path.name}")
 
     with tempfile.TemporaryDirectory(prefix="hwpx-build-") as temp_dir:
         working_dir = Path(temp_dir)
@@ -575,6 +600,34 @@ def main() -> None:
         except Exception as exc:
             logging.warning("fix_hwpx_namespaces 실패 — 계속 진행: %s", exc)
 
+    return output
+
+
+def _emit_error(code: str, message: str) -> None:
+    """Emit a structured, user-safe error on stdout for the Node caller to parse.
+
+    The full traceback stays on stderr for server logs; the user-facing channel
+    (this JSON line) never contains tracebacks or absolute paths. See CLAUDE.md
+    R4 / review PY-04. Node matches the `HWPX_BUILD_ERROR ` sentinel.
+    """
+    payload = json.dumps({"error_code": code, "message": message}, ensure_ascii=False)
+    print(f"HWPX_BUILD_ERROR {payload}")
+
+
+def main() -> None:
+    try:
+        output = run()
+    except TemplateNotFoundError as exc:
+        _emit_error("TEMPLATE_NOT_FOUND", str(exc))
+        sys.exit(2)
+    except SectionsParseError as exc:
+        _emit_error("SECTIONS_PARSE_ERROR", str(exc))
+        sys.exit(2)
+    except Exception:
+        # Full traceback to stderr (server logs only); generic message to user.
+        logging.getLogger("build_hwpx").exception("HWPX build failed")
+        _emit_error("BUILD_FAILED", "문서 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
+        sys.exit(1)
     print(f"Built {output}")
 
 

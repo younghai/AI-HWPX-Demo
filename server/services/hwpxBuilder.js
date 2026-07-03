@@ -21,6 +21,32 @@ await fs.mkdir(generatedDir, { recursive: true })
 
 export const generatedDirectory = generatedDir
 
+// Map build_hwpx.py's structured stdout error (see its _emit_error) to a
+// user-safe message + HTTP status. Falls back to a generic message so raw
+// tracebacks never reach the client (CLAUDE.md R4).
+const WORKER_ERROR_STATUS = {
+  TEMPLATE_NOT_FOUND: 422,
+  SECTIONS_PARSE_ERROR: 422,
+  BUILD_FAILED: 500
+}
+
+function parseWorkerError(stdout) {
+  const line = String(stdout || '')
+    .split('\n')
+    .find((l) => l.startsWith('HWPX_BUILD_ERROR '))
+  if (line) {
+    try {
+      const parsed = JSON.parse(line.slice('HWPX_BUILD_ERROR '.length))
+      if (parsed && typeof parsed.message === 'string') {
+        return { message: parsed.message, status: WORKER_ERROR_STATUS[parsed.error_code] || 500 }
+      }
+    } catch {
+      /* fall through to generic */
+    }
+  }
+  return { message: 'HWPX 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.', status: 500 }
+}
+
 export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSections, rawDiagrams, docType }) {
   if (!title) throw createHttpError('제목이 비어 있습니다.', 422)
 
@@ -93,7 +119,13 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
   }
 
   if (!result.ok) {
-    throw createHttpError(result.stderr || 'HWPX 생성에 실패했습니다.', 500)
+    // Clean up any partially-written output so it is never served (review PY-03).
+    await fs.unlink(outputPath).catch(() => {})
+    const { message, status } = parseWorkerError(result.stdout)
+    // Never surface raw stderr/traceback to the user (CLAUDE.md R4). The full
+    // stderr is preserved in server logs for debugging.
+    if (result.stderr) console.error('[build_hwpx] worker failed:', result.stderr)
+    throw createHttpError(message, status)
   }
 
   // v4: 생성된 HWPX 에 대해 native + polaris 검증 실행.

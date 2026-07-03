@@ -20,6 +20,8 @@
   --overlay-hover: rgba(0, 0, 0, 0.06);
   --eyebrow: #8f7044;
   --download-ink: #5b4b09;
+  --font-sans: 'Pretendard', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --mono: 'SF Mono', 'JetBrains Mono', 'D2Coding', ui-monospace, 'Courier New', monospace;
   --radius-sm: 14px;
   --radius-md: 24px;
   --radius-lg: 34px;
@@ -63,8 +65,11 @@
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text);
+  /* Korean line-breaking: keep words intact, wrap on word boundaries. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   background:
     radial-gradient(circle at top left, rgba(255, 212, 56, 0.2), transparent 24%),
     radial-gradient(circle at top right, rgba(17, 17, 17, 0.06), transparent 18%),

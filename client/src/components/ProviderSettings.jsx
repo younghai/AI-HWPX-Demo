@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 const ENV_KEY_BY_PROVIDER = {
   anthropic: 'ANTHROPIC_API_KEY',
@@ -12,6 +13,8 @@ export function ProviderSettings({ open, providers, aiProvider, setAiProvider, r
   const [testResult, setTestResult] = useState('')
   const [authMode, setAuthMode] = useState('apikey')
   const [oauthStep, setOauthStep] = useState(0)
+  const dialogRef = useRef(null)
+  useFocusTrap(dialogRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -105,6 +108,7 @@ export function ProviderSettings({ open, providers, aiProvider, setAiProvider, r
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
       <div
+        ref={dialogRef}
         className="modal-content"
         role="dialog"
         aria-modal="true"

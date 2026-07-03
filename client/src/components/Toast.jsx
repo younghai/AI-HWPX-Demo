@@ -1,15 +1,29 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export function Toast({ id, type = 'info', message, action, onDismiss, duration = 5000 }) {
+  const [paused, setPaused] = useState(false)
+  const remainingRef = useRef(duration)
+  const startedRef = useRef(0)
+
   useEffect(() => {
-    if (duration <= 0) return undefined
-    const timer = setTimeout(() => onDismiss(id), duration)
-    return () => clearTimeout(timer)
-  }, [id, duration, onDismiss])
+    if (duration <= 0 || paused) return undefined
+    startedRef.current = performance.now()
+    const timer = setTimeout(() => onDismiss(id), remainingRef.current)
+    return () => {
+      clearTimeout(timer)
+      // Preserve the time left so hovering pauses (not restarts) the countdown.
+      remainingRef.current = Math.max(0, remainingRef.current - (performance.now() - startedRef.current))
+    }
+  }, [id, duration, onDismiss, paused])
 
   const icon = type === 'error' ? '✗' : type === 'success' ? '✓' : type === 'warning' ? '⚠' : 'ⓘ'
   return (
-    <div className={`toast toast-${type}`} role={type === 'error' ? 'alert' : 'status'}>
+    <div
+      className={`toast toast-${type}`}
+      role={type === 'error' ? 'alert' : 'status'}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
       <span className="toast-icon" aria-hidden="true">{icon}</span>
       <div className="toast-body">
         <p>{message}</p>

@@ -116,5 +116,14 @@ export function useDraft({ setParseStatus }) {
     triggerDownload(exportState.url, exportState.fileName)
   }
 
-  return { draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt }
+  function cancelAll() {
+    draftControllerRef.current?.abort()
+    exportControllerRef.current?.abort()
+    draftControllerRef.current = null
+    exportControllerRef.current = null
+    setDraftLoading(false)
+    resetExport()
+  }
+
+  return { draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll }
 }

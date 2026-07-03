@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 
 const ACCEPTED_EXTENSIONS = ['.hwp', '.hwpx']
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 function isAcceptedFile(file) {
   if (!file) return false
@@ -26,6 +27,11 @@ export function Uploader({ onFileSelect, currentFile, currentInsight }) {
     if (!file) return
     if (!isAcceptedFile(file)) {
       setRejectMessage(`지원하지 않는 파일 형식입니다: ${file.name} — .hwp 또는 .hwpx 만 업로드할 수 있습니다.`)
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1)
+      setRejectMessage(`파일이 너무 큽니다 (${mb}MB). 최대 20MB까지 업로드할 수 있습니다.`)
       return
     }
     onFileSelect(file)

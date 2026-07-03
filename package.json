@@ -9,6 +9,8 @@
     "dev:client": "pnpm -C client dev",
     "dev:server": "pnpm -C server dev",
     "build": "pnpm -C client build",
+    "lint": "pnpm -C client lint",
+    "test": "pnpm -C client test",
     "postinstall": "bash scripts/setup-rhwp-symlink.sh"
   },
   "devDependencies": {

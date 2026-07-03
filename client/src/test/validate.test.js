@@ -11,12 +11,15 @@ describe('validateDraftPayload', () => {
     expect(() => validateDraftPayload(draft)).not.toThrow()
   })
 
-  it('rejects missing summary', () => {
+  it('treats summary as optional (defaults to empty string)', () => {
+    // summary is intentionally optional — buildDraftWithAI supplies a fallback.
     const draft = {
       sections: [{ heading: '제목', body: '본문' }],
       diagrams: []
     }
-    expect(() => validateDraftPayload(draft)).toThrow()
+    let result
+    expect(() => { result = validateDraftPayload(draft) }).not.toThrow()
+    expect(result.summary).toBe('')
   })
 
   it('rejects empty sections', () => {

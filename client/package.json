@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5192",
-    "build": "vite build"
+    "build": "vite build",
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
     "@rhwp/core": "0.7.17",
@@ -13,9 +15,14 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
     "jsdom": "^25.0.1",
     "vite": "^5.4.21",
     "vitest": "^3.1.1"

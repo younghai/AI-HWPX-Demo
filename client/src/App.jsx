@@ -4,6 +4,7 @@ import { LoginOverlay } from './components/LoginOverlay.jsx'
 import { ProviderSettings } from './components/ProviderSettings.jsx'
 import { ControlPanel } from './components/ControlPanel.jsx'
 import { PreviewPanel } from './components/PreviewPanel.jsx'
+import { ProgressStepper } from './components/ProgressStepper.jsx'
 import { ValidationPanel } from './components/ValidationPanel.jsx'
 import { EmptyState } from './components/EmptyState.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
@@ -25,6 +26,7 @@ export default function App() {
   const [notes, setNotes] = useState('핵심 메시지는 유지하고, 목차는 더 명확하게 재구성해 주세요.')
   const [targetTitle, setTargetTitle] = useState('')
   const [showSettings, setShowSettings] = useState(false)
+  const [stage, setStage] = useState('idle')
 
   const { user, logout, loginWithPopup } = useAuth()
   const autoLogin = import.meta.env.VITE_AUTO_LOGIN === 'true'
@@ -47,10 +49,17 @@ export default function App() {
     clearBuiltPreview
   } = useRhwp()
   const {
-    draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt
+    draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll
   } = useDraft({ setParseStatus })
 
+  function handleCancel() {
+    cancelAll()
+    setStage('idle')
+    setParseStatus('작업을 취소했습니다.')
+  }
+
   async function handleFileSelect(file) {
+    setStage('idle')
     if (!file) {
       setSourceFile(null)
       setDraft(null)
@@ -88,11 +97,13 @@ export default function App() {
       })
       return
     }
+    setStage('generating')
     const next = await generateDraft({
       sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle,
       aiProvider, onOptimistic: scrollToPreview
     })
     if (!next) {
+      setStage('error')
       scrollToPreview()
       errorToast('AI 초안 생성에 실패했습니다. 우측 패널의 메시지를 확인해주세요.')
       return
@@ -105,9 +116,11 @@ export default function App() {
       info(`AI 응답 ${(next.usage.elapsedMs / 1000).toFixed(1)}초${cost}`)
     }
 
+    setStage('building')
     setParseStatus('AI 초안을 바탕으로 HWPX 파일을 생성하는 중입니다...')
     const built = await buildHwpx({ draftOverride: next, sourceFile, sourceInsight, docType })
     if (built?.url) {
+      setStage('rendering')
       setParseStatus('HWPX를 렌더링해 미리보기에 반영합니다...')
       const rendered = await renderBuiltHwpx(built.url, built.fileName)
       if (rendered) {
@@ -115,6 +128,7 @@ export default function App() {
       } else {
         setParseStatus('HWPX 파일이 생성되었습니다. 다운로드 버튼으로 받을 수 있습니다.')
       }
+      setStage('done')
       // 검증 결과 토스트
       const v = built.validation
       if (v) {
@@ -127,6 +141,7 @@ export default function App() {
         }
       }
     } else {
+      setStage('error')
       errorToast('HWPX 빌드에 실패했습니다.')
     }
     scrollToPreview()
@@ -180,6 +195,8 @@ export default function App() {
 
         <div className="preview-column">
           {showEmptyState && <EmptyState onTrySample={handleTrySample} />}
+
+          <ProgressStepper stage={stage} onCancel={handleCancel} />
 
           <PreviewPanel
             ref={previewPanelRef}

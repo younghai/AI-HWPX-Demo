@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint client (catches undefined refs — the ErrorBoundary-class bug)
+        run: pnpm -C client lint
+
+      - name: Client unit tests
+        run: pnpm -C client test
+
+      - name: Client production build
+        run: pnpm -C client build
+
+      - name: Server module syntax
+        run: |
+          cd server
+          for f in index.js lib/*.js services/*.js routes/*.js; do node --check "$f"; done
+
+      - name: Python syntax
+        run: python -m py_compile scripts/build_hwpx.py scripts/clone_form.py scripts/fix_namespaces.py scripts/diagram_templates.py
+
+      - name: Python regression suite (R5/R6/NFC/escape/atomic-write)
+        run: python -m pytest scripts/tests -q

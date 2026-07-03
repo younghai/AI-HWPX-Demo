@@ -30,12 +30,21 @@ export function TopBar({ hasConfigured, activeProviderLabel, onOpenSettings, use
             Google 로그인
           </button>
         )}
-        <span
-          className={`status-dot ${connected ? 'is-connected' : 'is-disconnected'}`}
-          role="status"
-          aria-label={dotLabel}
-          title={dotLabel}
-        />
+        {connected ? (
+          <span className="ai-status ai-status--connected" role="status" title={dotLabel}>
+            <span className="status-dot is-connected" aria-hidden="true" />
+            {activeProviderLabel || 'AI 연결됨'}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="ai-status ai-status--disconnected"
+            onClick={onOpenSettings}
+          >
+            <span className="status-dot is-disconnected" aria-hidden="true" />
+            AI 키 필요 — 설정
+          </button>
+        )}
         <button
           type="button"
           className="icon-button"

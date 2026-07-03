@@ -19,6 +19,11 @@ export const AI_PROVIDERS = {
     baseUrl: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o',
     envKey: 'OPENAI_API_KEY',
+    // OpenAI reliably supports response_format json_object; enabling it for the
+    // draft path removes JSON-parse flakiness. Left off for kimi/xai until
+    // verified with real keys (review BE-13); their responses still go through
+    // the hardened tryExtractJson.
+    jsonMode: true,
     models: [
       { id: 'gpt-4o', label: 'GPT-4o · 균형 (권장)', priceIn: 2.5, priceOut: 10 },
       { id: 'gpt-4o-mini', label: 'GPT-4o mini · 빠름·저비용', priceIn: 0.15, priceOut: 0.6 }

@@ -52,17 +52,50 @@ function normalizeDiagram(spec) {
   return { _diagram: true, type, title, afterSection, data }
 }
 
+// Extract the first balanced JSON object from an AI response. Prefers a fenced
+// ```json block, then scans brace depth (respecting strings/escapes) so trailing
+// prose after the object doesn't corrupt the slice. Falls back to the naive
+// first-{…last-} slice for maximum tolerance. (review BE-13)
 export function tryExtractJson(text) {
   if (typeof text !== 'string') return null
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
   const candidate = fenced ? fenced[1] : text
+
+  const balanced = extractBalancedObject(candidate)
+  if (balanced) {
+    try { return JSON.parse(balanced) } catch { /* fall through */ }
+  }
+
   const start = candidate.indexOf('{')
   const end = candidate.lastIndexOf('}')
   if (start === -1 || end === -1 || end <= start) return null
-  const slice = candidate.slice(start, end + 1)
   try {
-    return JSON.parse(slice)
+    return JSON.parse(candidate.slice(start, end + 1))
   } catch {
     return null
   }
+}
+
+function extractBalancedObject(str) {
+  const start = str.indexOf('{')
+  if (start === -1) return null
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < str.length; i += 1) {
+    const ch = str[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === '{') depth += 1
+    else if (ch === '}') {
+      depth -= 1
+      if (depth === 0) return str.slice(start, i + 1)
+    }
+  }
+  return null
 }

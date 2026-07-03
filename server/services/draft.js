@@ -129,7 +129,7 @@ export async function buildDraftWithAI(input) {
   const chosenModel = resolveModel(provider, input.model)
   const callOnce = () => providerKey === 'anthropic'
     ? callAnthropic(provider, apiKey, prompt, { model: chosenModel.id })
-    : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id })
+    : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id, jsonMode: provider.jsonMode })
 
   let realUsage = null
 

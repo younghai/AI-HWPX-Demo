@@ -44,7 +44,7 @@ export async function callAnthropic(provider, apiKey, prompt, { systemPrompt, mo
   }
 }
 
-export async function callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model } = {}) {
+export async function callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model, jsonMode } = {}) {
   const { signal, clear } = withTimeout(AI_TIMEOUT_MS)
   try {
     const response = await fetch(provider.baseUrl, {
@@ -56,6 +56,9 @@ export async function callOpenAICompatible(provider, apiKey, prompt, { systemPro
       body: JSON.stringify({
         model: model || provider.defaultModel,
         max_tokens: 4096,
+        // Force valid JSON output where the provider supports it (openai);
+        // the prompt already instructs JSON so json_object mode is satisfied.
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           { role: 'system', content: systemPrompt || DEFAULT_SYSTEM },
           { role: 'user', content: prompt }

@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
@@ -16,5 +17,8 @@
     "multer": "^2.0.2",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.6"
   }
 }

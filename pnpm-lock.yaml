@@ -87,6 +87,10 @@ importers:
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
+    devDependencies:
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(jsdom@25.0.1)
 
 packages:
 

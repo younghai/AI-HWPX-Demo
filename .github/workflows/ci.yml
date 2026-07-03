@@ -36,6 +36,11 @@ jobs:
       - name: Client unit tests
         run: pnpm -C client test
 
+      - name: Server unit tests
+        run: pnpm -C server test
+        env:
+          NODE_ENV: test
+
       - name: Client production build
         run: pnpm -C client build
 

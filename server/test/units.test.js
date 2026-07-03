@@ -1,0 +1,153 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import fs from 'fs/promises'
+import path from 'path'
+import os from 'os'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// ── upload validation (BE-08/14) ─────────────────────────────────────────────
+import { assertValidUpload, decodeOriginalName } from '../lib/upload.js'
+
+const PK = Buffer.from([0x50, 0x4b, 0x03, 0x04])
+const OLE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
+
+describe('assertValidUpload', () => {
+  it('accepts a well-formed .hwpx (PK magic)', () => {
+    expect(() => assertValidUpload({ originalname: 'a.hwpx', mimetype: '', buffer: Buffer.concat([PK, Buffer.alloc(10)]) })).not.toThrow()
+  })
+  it('rejects a .hwpx with wrong magic', () => {
+    expect(() => assertValidUpload({ originalname: 'a.hwpx', mimetype: '', buffer: Buffer.from('NOTPK___') })).toThrow()
+  })
+  it('accepts a well-formed .hwp (OLE magic)', () => {
+    expect(() => assertValidUpload({ originalname: 'a.hwp', mimetype: '', buffer: Buffer.concat([OLE, Buffer.alloc(10)]) })).not.toThrow()
+  })
+  it('rejects a .hwp with wrong magic (arbitrary binary)', () => {
+    expect(() => assertValidUpload({ originalname: 'a.hwp', mimetype: 'application/octet-stream', buffer: Buffer.from('MZ__evil') })).toThrow()
+  })
+  it('rejects an unsupported extension', () => {
+    expect(() => assertValidUpload({ originalname: 'a.exe', mimetype: '', buffer: PK })).toThrow()
+  })
+  it('accepts the Hancom +zip MIME (sample loader tag)', () => {
+    expect(() => assertValidUpload({ originalname: 'a.hwpx', mimetype: 'application/hwp+zip', buffer: Buffer.concat([PK, Buffer.alloc(4)]) })).not.toThrow()
+  })
+})
+
+describe('decodeOriginalName', () => {
+  it('returns a fallback for empty', () => {
+    expect(decodeOriginalName('')).toBe('uploaded-document')
+  })
+  it('NFC-normalizes', () => {
+    const nfd = 'á.hwpx' // a + combining acute
+    expect(decodeOriginalName(nfd)).toBe('á.hwpx'.normalize('NFC'))
+  })
+})
+
+// ── env parse + atomic concurrent write (BE-03) ──────────────────────────────
+import { parseEnvFile } from '../lib/env.js'
+
+describe('parseEnvFile', () => {
+  it('parses KEY=VALUE lines, ignores comments/blanks', () => {
+    const m = parseEnvFile('# c\nA=1\n\nB="two"\nC=\n')
+    expect(m.get('A')).toBe('1')
+    expect(m.get('B')).toBe('two')
+    expect(m.get('C')).toBe('')
+  })
+})
+
+// ── metrics (BE-18) ──────────────────────────────────────────────────────────
+import { record, snapshot } from '../lib/metrics.js'
+
+describe('metrics', () => {
+  it('records ok/fail + averages latency', () => {
+    record('unit_op', { ok: true, ms: 100 })
+    record('unit_op', { ok: false, ms: 200 })
+    const s = snapshot().unit_op
+    expect(s.ok).toBe(1)
+    expect(s.fail).toBe(1)
+    expect(s.total).toBe(2)
+    expect(s.avgMs).toBe(150)
+  })
+})
+
+// ── oauth token store (BE-05) ────────────────────────────────────────────────
+import { setOAuthToken, hasOAuthToken, getValidAccessToken, clearOAuthToken } from '../lib/oauthTokens.js'
+
+describe('oauthTokens', () => {
+  afterEach(() => clearOAuthToken('openai'))
+  it('stores and returns a valid token', async () => {
+    setOAuthToken('openai', { accessToken: 'tok', refreshToken: 'r', expiresInSec: 3600 })
+    expect(hasOAuthToken('openai')).toBe(true)
+    const provider = { oauth: { tokenUrl: 'https://x', clientIdEnv: 'X', clientSecretEnv: 'Y' } }
+    expect(await getValidAccessToken(provider, 'openai')).toBe('tok')
+  })
+  it('drops an expired token with no refresh capability', async () => {
+    setOAuthToken('openai', { accessToken: 'tok', refreshToken: null, expiresInSec: -10 })
+    const provider = { oauth: null }
+    expect(await getValidAccessToken(provider, 'openai')).toBeNull()
+    expect(hasOAuthToken('openai')).toBe(false)
+  })
+})
+
+// ── cleanup sweep (BE-09) ────────────────────────────────────────────────────
+import { sweepGenerated } from '../lib/cleanup.js'
+
+describe('sweepGenerated', () => {
+  let dir
+  beforeEach(async () => { dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sweep-')) })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('deletes files older than TTL, keeps recent ones', async () => {
+    const oldF = path.join(dir, 'old.hwpx')
+    const newF = path.join(dir, 'new.hwpx')
+    await fs.writeFile(oldF, 'x')
+    await fs.writeFile(newF, 'y')
+    const old = new Date(Date.now() - 48 * 3600 * 1000)
+    await fs.utimes(oldF, old, old)
+    const res = await sweepGenerated(dir, { now: Date.now() })
+    expect(res.removed).toBe(1)
+    expect(await fs.readdir(dir)).toEqual(['new.hwpx'])
+  })
+
+  it('returns 0 for a missing directory', async () => {
+    const res = await sweepGenerated(path.join(dir, 'nope'), { now: Date.now() })
+    expect(res.removed).toBe(0)
+  })
+})
+
+// ── authGuard: local passes, protected 401s (BE-01) ──────────────────────────
+function mockRes() {
+  return {
+    statusCode: 200,
+    body: null,
+    status(c) { this.statusCode = c; return this },
+    json(b) { this.body = b; return this }
+  }
+}
+
+describe('requireSession', () => {
+  afterEach(() => { vi.resetModules(); vi.unstubAllEnvs() })
+
+  it('local mode passes through without a session', async () => {
+    vi.stubEnv('AUTH_MODE', 'local')
+    vi.resetModules()
+    const { requireSession } = await import('../lib/authGuard.js')
+    const res = mockRes()
+    let called = false
+    requireSession({ cookies: {} }, res, () => { called = true })
+    expect(called).toBe(true)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('protected mode returns 401 without a session', async () => {
+    vi.stubEnv('AUTH_MODE', 'protected')
+    vi.resetModules()
+    const { requireSession } = await import('../lib/authGuard.js')
+    const res = mockRes()
+    let called = false
+    requireSession({ cookies: {} }, res, () => { called = true })
+    expect(called).toBe(false)
+    expect(res.statusCode).toBe(401)
+    expect(res.body.code).toBe('UNAUTHENTICATED')
+  })
+})

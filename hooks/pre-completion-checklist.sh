@@ -74,6 +74,15 @@ for f in shared/*.js; do
 done
 
 echo ""
+echo "=== Server unit tests (vitest) ==="
+if (cd server && NODE_ENV=test pnpm test) > /tmp/ai-hwp-server-test.log 2>&1; then
+  pass "$(grep -oE 'Tests +[0-9]+ passed' /tmp/ai-hwp-server-test.log | tail -1)"
+else
+  fail "server vitest 실패 — 로그: /tmp/ai-hwp-server-test.log"
+  tail -15 /tmp/ai-hwp-server-test.log | sed 's/^/      /'
+fi
+
+echo ""
 echo "=== Client production build ==="
 if (cd client && pnpm run build 2>&1 | tail -5 | grep -q 'built in'); then
   pass "vite build"

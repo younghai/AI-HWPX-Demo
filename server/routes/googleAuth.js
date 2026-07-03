@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { createSession, getSession, destroySession } from '../lib/session.js'
+import { escapeXml } from '../../shared/escape.js'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
@@ -66,7 +67,7 @@ button{padding:12px 24px;border:none;border-radius:999px;background:#161616;colo
 <div class="card">
 <div class="icon">${success ? '&#10003;' : '&#10007;'}</div>
 <h2>${success ? '로그인 완료' : '로그인 실패'}</h2>
-<p>${message}</p>
+<p>${escapeXml(message)}</p>
 <button onclick="window.opener?.postMessage({type:'google-auth-result',success:${success}},'${CLIENT_ORIGIN}');window.close()">닫기</button>
 </div>
 <script>window.opener?.postMessage({type:'google-auth-result',success:${success}},'${CLIENT_ORIGIN}')</script>

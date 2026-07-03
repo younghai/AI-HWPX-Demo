@@ -2,11 +2,10 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { createSession, getSession, destroySession } from '../lib/session.js'
 import { escapeXml } from '../../shared/escape.js'
+import { CLIENT_ORIGIN, OAUTH_REDIRECT_BASE, IS_PRODUCTION, SESSION_COOKIE } from '../lib/config.js'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5188'
-const OAUTH_REDIRECT_BASE = process.env.OAUTH_REDIRECT_BASE || `http://127.0.0.1:${process.env.PORT || 8788}`
 
 // Reject obvious placeholder values (.env 에 진짜 값 없이 템플릿 문자열만 들어있는 경우)
 // 진짜 Google Client ID 포맷: "<숫자>-<영숫자>.apps.googleusercontent.com"
@@ -26,7 +25,7 @@ const CLIENT_SECRET_CONFIGURED = !isPlaceholderCredential(GOOGLE_CLIENT_SECRET)
 // convenience. It must NEVER be reachable in production, else it's a total auth
 // bypass (review BE-08). Only allowed when not production AND real OAuth is
 // unconfigured (i.e. genuinely a local dev box).
-const ALLOW_MOCK = process.env.NODE_ENV !== 'production'
+const ALLOW_MOCK = !IS_PRODUCTION
   && (!CLIENT_ID_CONFIGURED || !CLIENT_SECRET_CONFIGURED)
 
 // Session cookie flags. `secure` in production (HTTPS-only). `sameSite: 'lax'`
@@ -36,7 +35,7 @@ function cookieOptions(extra = {}) {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PRODUCTION,
     maxAge: 24 * 60 * 60 * 1000,
     ...extra
   }
@@ -169,7 +168,7 @@ router.get('/auth/google/callback', async (req, res) => {
       picture: userData.picture
     }
     const sid = createSession(user)
-    res.cookie('v2_session', sid, cookieOptions())
+    res.cookie(SESSION_COOKIE, sid, cookieOptions())
     res.send(resultPage(true, `${user.name || user.email}님, 환영합니다!`))
   } catch (err) {
     res.send(resultPage(false, `로그인 오류: ${err.message}`))
@@ -182,21 +181,21 @@ if (ALLOW_MOCK) {
     const name = String(req.query.name || '개발자').trim()
     const user = { email, name, picture: '' }
     const sid = createSession(user)
-    res.cookie('v2_session', sid, cookieOptions())
+    res.cookie(SESSION_COOKIE, sid, cookieOptions())
     res.send(resultPage(true, `${name} (${email})님, Mock 로그인 완료!`))
   })
 }
 
 router.get('/api/me', (req, res) => {
-  const sid = req.cookies?.v2_session
+  const sid = req.cookies?.[SESSION_COOKIE]
   const user = getSession(sid)
   res.json({ ok: true, user })
 })
 
 router.post('/api/logout', (req, res) => {
-  const sid = req.cookies?.v2_session
+  const sid = req.cookies?.[SESSION_COOKIE]
   destroySession(sid)
-  res.clearCookie('v2_session', cookieOptions({ maxAge: undefined }))
+  res.clearCookie(SESSION_COOKIE, cookieOptions({ maxAge: undefined }))
   res.json({ ok: true })
 })
 

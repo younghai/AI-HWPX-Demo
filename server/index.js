@@ -16,10 +16,9 @@ import googleAuthRouter from './routes/googleAuth.js'
 import { generatedDirectory } from './services/hwpxBuilder.js'
 import { startGeneratedCleanup } from './lib/cleanup.js'
 import { requireSession } from './lib/authGuard.js'
+import { PORT, CLIENT_ORIGIN, OAUTH_REDIRECT_BASE } from './lib/config.js'
 
-const PORT = Number(process.env.PORT || 8792)
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5192'
-const OAUTH_BASE = process.env.OAUTH_REDIRECT_BASE || `http://127.0.0.1:${PORT}`
+const OAUTH_BASE = OAUTH_REDIRECT_BASE
 
 const app = express()
 // helmet security headers. CSP is disabled because the OAuth result pages rely

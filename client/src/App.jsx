@@ -20,7 +20,6 @@ export default function App() {
   const previewPanelRef = useRef(null)
 
   const [sourceFile, setSourceFile] = useState(null)
-  const [aiApiKey] = useState('')
   const [docType, setDocType] = useState('report')
   const [companyName, setCompanyName] = useState('Bizmatrixx')
   const [goal, setGoal] = useState('업로드한 문서의 핵심 내용을 바탕으로 임원 검토용 초안을 만들어 주세요.')

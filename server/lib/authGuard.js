@@ -1,11 +1,11 @@
 import { getSession } from './session.js'
+import { AUTH_MODE, SESSION_COOKIE } from './config.js'
 
 // AUTH_MODE=local (default) keeps the localhost single-user experience friction-
 // less: routes pass through without a session. AUTH_MODE=protected enforces a
 // valid session cookie on state-changing / cost-incurring routes, which is what
 // an external deployment must run with (review BE-01/BE-02).
-export const AUTH_MODE = process.env.AUTH_MODE === 'protected' ? 'protected' : 'local'
-export const SESSION_COOKIE = 'v2_session'
+export { AUTH_MODE, SESSION_COOKIE }
 
 export function currentUser(req) {
   return getSession(req.cookies?.[SESSION_COOKIE])

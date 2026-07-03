@@ -1372,6 +1372,59 @@ small.helper {
   gap: 12px;
 }
 .preview-head-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+/* Recent-documents history (review PO-07) */
+.history-panel {
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+.history-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.history-chevron { color: var(--muted); }
+.history-list { list-style: none; margin: 0; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+}
+.history-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.history-item-meta strong {
+  font-size: 0.84rem; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-item-meta span { font-size: 0.74rem; color: var(--muted); }
+.history-download {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.history-download:hover { border-color: var(--accent-strong); }
 .preview-edit-again {
   padding: 6px 14px;
   border-radius: var(--radius-pill);

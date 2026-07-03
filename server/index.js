@@ -8,6 +8,7 @@ import providersRouter from './routes/providers.js'
 import draftRouter from './routes/draft.js'
 import exportRouter from './routes/export.js'
 import samplesRouter from './routes/samples.js'
+import historyRouter from './routes/history.js'
 import { createAuthRouter } from './routes/auth.js'
 import googleAuthRouter from './routes/googleAuth.js'
 import { generatedDirectory } from './services/hwpxBuilder.js'
@@ -27,6 +28,7 @@ app.use(providersRouter)
 app.use(draftRouter)
 app.use(exportRouter)
 app.use(samplesRouter)
+app.use(historyRouter)
 app.use(googleAuthRouter)
 app.use(createAuthRouter({ oauthBase: OAUTH_BASE, clientOrigin: CLIENT_ORIGIN }))
 

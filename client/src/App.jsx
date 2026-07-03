@@ -6,6 +6,7 @@ import { ControlPanel } from './components/ControlPanel.jsx'
 import { PreviewPanel } from './components/PreviewPanel.jsx'
 import { ProgressStepper } from './components/ProgressStepper.jsx'
 import { ValidationPanel } from './components/ValidationPanel.jsx'
+import { HistoryPanel } from './components/HistoryPanel.jsx'
 import { EmptyState } from './components/EmptyState.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { ToastContainer } from './components/Toast.jsx'
@@ -254,6 +255,8 @@ export default function App() {
           {exportState.validation && (
             <ValidationPanel validation={exportState.validation} />
           )}
+
+          <HistoryPanel refreshKey={exportState.url} />
         </div>
       </main>
 

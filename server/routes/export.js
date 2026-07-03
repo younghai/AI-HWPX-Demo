@@ -2,6 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { buildHwpx } from '../services/hwpxBuilder.js'
 import { sendError } from '../lib/errors.js'
+import { requireSession } from '../lib/authGuard.js'
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } })
@@ -22,7 +23,7 @@ function uploadSourceFile(req, res, next) {
   })
 }
 
-router.post('/api/export-hwpx', uploadSourceFile, async (req, res) => {
+router.post('/api/export-hwpx', requireSession, uploadSourceFile, async (req, res) => {
   try {
     const result = await buildHwpx({
       title: String(req.body?.title || '').trim(),

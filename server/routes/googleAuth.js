@@ -21,6 +21,26 @@ const CLIENT_ID_CONFIGURED = !isPlaceholderCredential(GOOGLE_CLIENT_ID)
   && GOOGLE_CLIENT_ID.includes('.apps.googleusercontent.com')
 const CLIENT_SECRET_CONFIGURED = !isPlaceholderCredential(GOOGLE_CLIENT_SECRET)
 
+// Mock login issues a session for any email with no verification — a dev-only
+// convenience. It must NEVER be reachable in production, else it's a total auth
+// bypass (review BE-08). Only allowed when not production AND real OAuth is
+// unconfigured (i.e. genuinely a local dev box).
+const ALLOW_MOCK = process.env.NODE_ENV !== 'production'
+  && (!CLIENT_ID_CONFIGURED || !CLIENT_SECRET_CONFIGURED)
+
+// Session cookie flags. `secure` in production (HTTPS-only). `sameSite: 'lax'`
+// is CSRF-protective for the API's cross-site POST/fetch (lax cookies aren't
+// sent on those) while still surviving the top-level OAuth redirect return.
+function cookieOptions(extra = {}) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000,
+    ...extra
+  }
+}
+
 const googleStates = new Map()
 const STATE_TTL_MS = 10 * 60 * 1000
 
@@ -87,6 +107,9 @@ router.get('/auth/google', (_req, res) => {
     if (!CLIENT_ID_CONFIGURED) missing.push('GOOGLE_CLIENT_ID')
     if (!CLIENT_SECRET_CONFIGURED) missing.push('GOOGLE_CLIENT_SECRET')
     console.warn('[googleAuth] 설정 누락:', missing.join(', '))
+    if (!ALLOW_MOCK) {
+      return res.status(503).send(resultPage(false, 'Google 로그인이 구성되지 않았습니다. 관리자에게 문의하세요.'))
+    }
     return res.status(200).send(mockLoginPage())
   }
   const state = crypto.randomBytes(16).toString('hex')
@@ -145,29 +168,23 @@ router.get('/auth/google/callback', async (req, res) => {
       picture: userData.picture
     }
     const sid = createSession(user)
-    res.cookie('v2_session', sid, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000
-    })
+    res.cookie('v2_session', sid, cookieOptions())
     res.send(resultPage(true, `${user.name || user.email}님, 환영합니다!`))
   } catch (err) {
     res.send(resultPage(false, `로그인 오류: ${err.message}`))
   }
 })
 
-router.get('/auth/google/mock', (req, res) => {
-  const email = String(req.query.email || 'developer@localhost').trim()
-  const name = String(req.query.name || '개발자').trim()
-  const user = { email, name, picture: '' }
-  const sid = createSession(user)
-  res.cookie('v2_session', sid, {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000
+if (ALLOW_MOCK) {
+  router.get('/auth/google/mock', (req, res) => {
+    const email = String(req.query.email || 'developer@localhost').trim()
+    const name = String(req.query.name || '개발자').trim()
+    const user = { email, name, picture: '' }
+    const sid = createSession(user)
+    res.cookie('v2_session', sid, cookieOptions())
+    res.send(resultPage(true, `${name} (${email})님, Mock 로그인 완료!`))
   })
-  res.send(resultPage(true, `${name} (${email})님, Mock 로그인 완료!`))
-})
+}
 
 router.get('/api/me', (req, res) => {
   const sid = req.cookies?.v2_session
@@ -178,7 +195,7 @@ router.get('/api/me', (req, res) => {
 router.post('/api/logout', (req, res) => {
   const sid = req.cookies?.v2_session
   destroySession(sid)
-  res.clearCookie('v2_session', { httpOnly: true, sameSite: 'lax' })
+  res.clearCookie('v2_session', cookieOptions({ maxAge: undefined }))
   res.json({ ok: true })
 })
 

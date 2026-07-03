@@ -3,6 +3,7 @@ import { AI_PROVIDERS, knownEnvKeys } from '../lib/providers-config.js'
 import { writeEnvFile } from '../lib/env.js'
 import { sendError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from '../services/ai.js'
+import { requireSession } from '../lib/authGuard.js'
 
 const router = Router()
 
@@ -18,7 +19,7 @@ router.get('/api/providers', (_req, res) => {
   res.json({ ok: true, providers: list })
 })
 
-router.post('/api/settings', async (req, res) => {
+router.post('/api/settings', requireSession, async (req, res) => {
   try {
     const allowedKeys = knownEnvKeys()
     const safeKeys = Object.fromEntries(
@@ -34,7 +35,7 @@ router.post('/api/settings', async (req, res) => {
   }
 })
 
-router.post('/api/test-provider', async (req, res) => {
+router.post('/api/test-provider', requireSession, async (req, res) => {
   const { provider: providerKey, apiKey } = req.body || {}
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) {

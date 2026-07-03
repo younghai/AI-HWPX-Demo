@@ -1,4 +1,26 @@
 import { spawn } from 'child_process'
+import os from 'os'
+
+// Bound concurrent worker spawns so a burst of exports can't fork-bomb the box
+// (each export spawns build_hwpx + validators). Default = cores-2, min 2, and
+// overridable via MAX_WORKER_SPAWNS. See review BE-19.
+const MAX_SPAWNS = Number(process.env.MAX_WORKER_SPAWNS) || Math.max(2, (os.cpus()?.length || 4) - 2)
+let activeSpawns = 0
+const spawnQueue = []
+
+function acquireSpawnSlot() {
+  if (activeSpawns < MAX_SPAWNS) {
+    activeSpawns += 1
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => spawnQueue.push(resolve))
+}
+
+function releaseSpawnSlot() {
+  const next = spawnQueue.shift()
+  if (next) next()
+  else activeSpawns = Math.max(0, activeSpawns - 1)
+}
 
 export function slugify(value) {
   return String(value)
@@ -14,13 +36,15 @@ export function sanitizeName(value) {
 
 const SIGKILL_GRACE_MS = 5000
 
-export function runProcess(command, args, cwd, { timeoutMs = 60000, env } = {}) {
+export async function runProcess(command, args, cwd, { timeoutMs = 60000, env } = {}) {
+  await acquireSpawnSlot()
   return new Promise((resolve) => {
     let child
     try {
       child = spawn(command, args, { cwd, env: env ? { ...process.env, ...env } : undefined })
     } catch (err) {
       // Synchronous spawn failure (e.g. bad cwd) — never leave the caller hanging.
+      releaseSpawnSlot()
       return resolve({ ok: false, stdout: '', stderr: `프로세스를 시작할 수 없습니다: ${err.message}` })
     }
 
@@ -34,6 +58,7 @@ export function runProcess(command, args, cwd, { timeoutMs = 60000, env } = {}) 
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
+      releaseSpawnSlot()
       resolve(result)
     }
 

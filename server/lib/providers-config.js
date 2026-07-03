@@ -1,9 +1,17 @@
+// Per-model prices are USD per 1M tokens (input/output), approximate and current
+// as of 2026-07. Centralized here so a single edit updates cost estimates —
+// pair with the provider-reported token counts (services/ai.js) for the estimate.
 export const AI_PROVIDERS = {
   anthropic: {
     label: 'Anthropic Claude',
     baseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-opus-4-7',
+    defaultModel: 'claude-sonnet-5',
     envKey: 'ANTHROPIC_API_KEY',
+    models: [
+      { id: 'claude-opus-4-8', label: 'Opus 4.8 · 최고 품질', priceIn: 15, priceOut: 75 },
+      { id: 'claude-sonnet-5', label: 'Sonnet 5 · 균형 (권장)', priceIn: 3, priceOut: 15 },
+      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 · 빠름·저비용', priceIn: 1, priceOut: 5 }
+    ],
     oauth: null
   },
   openai: {
@@ -11,6 +19,10 @@ export const AI_PROVIDERS = {
     baseUrl: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o',
     envKey: 'OPENAI_API_KEY',
+    models: [
+      { id: 'gpt-4o', label: 'GPT-4o · 균형 (권장)', priceIn: 2.5, priceOut: 10 },
+      { id: 'gpt-4o-mini', label: 'GPT-4o mini · 빠름·저비용', priceIn: 0.15, priceOut: 0.6 }
+    ],
     oauth: {
       authorizeUrl: 'https://auth.openai.com/authorize',
       tokenUrl: 'https://auth.openai.com/oauth/token',
@@ -22,8 +34,13 @@ export const AI_PROVIDERS = {
   kimi: {
     label: 'Kimi (Moonshot)',
     baseUrl: 'https://api.moonshot.cn/v1/chat/completions',
-    defaultModel: 'moonshot-v1-8k',
+    defaultModel: 'moonshot-v1-32k',
     envKey: 'KIMI_API_KEY',
+    models: [
+      { id: 'moonshot-v1-8k', label: 'moonshot-v1-8k · 짧은 문서', priceIn: 0.2, priceOut: 2 },
+      { id: 'moonshot-v1-32k', label: 'moonshot-v1-32k · 권장', priceIn: 0.5, priceOut: 2 },
+      { id: 'moonshot-v1-128k', label: 'moonshot-v1-128k · 대형 문서', priceIn: 2, priceOut: 5 }
+    ],
     oauth: {
       authorizeUrl: 'https://account.moonshot.cn/oauth/authorize',
       tokenUrl: 'https://account.moonshot.cn/oauth/token',
@@ -37,8 +54,21 @@ export const AI_PROVIDERS = {
     baseUrl: 'https://api.x.ai/v1/chat/completions',
     defaultModel: 'grok-3-mini',
     envKey: 'XAI_API_KEY',
+    models: [
+      { id: 'grok-3-mini', label: 'Grok 3 mini · 빠름·저비용', priceIn: 0.3, priceOut: 0.5 },
+      { id: 'grok-3', label: 'Grok 3 · 고품질', priceIn: 3, priceOut: 15 }
+    ],
     oauth: null
   }
+}
+
+// Resolve a requested model id to a valid one for the provider (falls back to
+// the provider default), returning the entry with pricing.
+export function resolveModel(provider, requestedId) {
+  const models = provider.models || []
+  const found = models.find((m) => m.id === requestedId)
+  if (found) return found
+  return models.find((m) => m.id === provider.defaultModel) || models[0] || { id: provider.defaultModel, priceIn: 0, priceOut: 0 }
 }
 
 export function knownEnvKeys() {

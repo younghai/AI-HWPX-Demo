@@ -12,7 +12,7 @@ export function useDraft({ setParseStatus }) {
     setExportState({ loading: false, url: '', fileName: '', message: '' })
   }
 
-  async function generateDraft({ sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle, aiProvider, aiApiKey, onOptimistic }) {
+  async function generateDraft({ sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle, aiProvider, aiModel, onOptimistic }) {
     if (!sourceFile) {
       setParseStatus('먼저 HWP 또는 HWPX 문서를 업로드해 주세요.')
       return null
@@ -41,6 +41,7 @@ export function useDraft({ setParseStatus }) {
           fileName: sourceInsight.fileName,
           sourceText: sourceInsight.extractedText,
           docType, companyName, goal, notes, targetTitle, aiProvider,
+          model: aiModel,
           templateBodySlots
         }),
         signal: controller.signal

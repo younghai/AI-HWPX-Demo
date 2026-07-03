@@ -33,7 +33,8 @@ export default function App() {
   const { toasts, dismiss, success, error: errorToast, info } = useToast()
 
   const {
-    providers, aiProvider, setAiProvider, refresh: refreshProviders, activeProvider, hasConfigured
+    providers, aiProvider, setAiProvider, refresh: refreshProviders, activeProvider, hasConfigured,
+    aiModel, setAiModel, activeModels
   } = useProviders((err) => {
     console.warn('providers fetch failed', err)
     errorToast('AI provider 목록을 불러오지 못했습니다.')
@@ -57,7 +58,7 @@ export default function App() {
 
   // Shared context for section-level regenerate + build (review PO-01).
   function draftContext() {
-    return { docType, companyName, goal, notes, sourceText: sourceInsight.extractedText, aiProvider }
+    return { docType, companyName, goal, notes, sourceText: sourceInsight.extractedText, aiProvider, model: aiModel }
   }
 
   function usageMessage(usage) {
@@ -119,7 +120,7 @@ export default function App() {
     setStage('generating')
     const next = await generateDraft({
       sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle,
-      aiProvider, onOptimistic: scrollToPreview
+      aiProvider, aiModel, onOptimistic: scrollToPreview
     })
     if (!next) {
       setStage('error')
@@ -215,6 +216,7 @@ export default function App() {
           targetTitle={targetTitle} setTargetTitle={setTargetTitle}
           goal={goal} setGoal={setGoal}
           notes={notes} setNotes={setNotes}
+          activeModels={activeModels} aiModel={aiModel} setAiModel={setAiModel}
           onGenerate={handleGenerate}
           onDownload={handleDownload}
           draftLoading={draftLoading}

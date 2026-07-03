@@ -13,6 +13,7 @@ export function ControlPanel({
   targetTitle, setTargetTitle,
   goal, setGoal,
   notes, setNotes,
+  activeModels = [], aiModel, setAiModel,
   onGenerate, onDownload,
   draftLoading, exportState, hasDraft,
   parseStatus
@@ -60,6 +61,17 @@ export function ControlPanel({
           </select>
           <small className="helper">생성할 문서의 성격을 선택하세요.</small>
         </label>
+        {activeModels.length > 1 && (
+          <label>
+            <span>AI 모델</span>
+            <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
+              {activeModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+            <small className="helper">품질·속도·비용이 다릅니다. 응답 후 실제 사용 토큰 기준 비용이 표시됩니다.</small>
+          </label>
+        )}
         <label>
           <span>회사명</span>
           <input

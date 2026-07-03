@@ -1,6 +1,6 @@
 import { tryExtractJson, validateDraftPayload, ValidationError } from '../../shared/validate.js'
 import { buildToc, deriveTitle, labelForDocType } from '../../shared/docTypes.js'
-import { AI_PROVIDERS } from '../lib/providers-config.js'
+import { AI_PROVIDERS, resolveModel } from '../lib/providers-config.js'
 import { createHttpError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from './ai.js'
 
@@ -100,20 +100,15 @@ export async function buildDraftWithAI(input) {
     effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots
   })
 
+  const chosenModel = resolveModel(provider, input.model)
   const callOnce = () => providerKey === 'anthropic'
-    ? callAnthropic(provider, apiKey, prompt)
-    : callOpenAICompatible(provider, apiKey, prompt)
+    ? callAnthropic(provider, apiKey, prompt, { model: chosenModel.id })
+    : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id })
 
   let realUsage = null
 
-  // v4: AI 비용/시간 측정용 (provider별 대략적 단가 — 정확한 토큰은 응답에 따라 다름)
-  // 단위: USD per 1M tokens (input, output) — 2025-10 시점 공개 단가 근사
-  const PRICING_USD_PER_M = {
-    anthropic: { in: 15, out: 75 },        // Claude Opus 4.7 (대략)
-    openai:    { in: 2.5, out: 10 },       // gpt-4o (대략)
-    kimi:      { in: 0.5, out: 2 },        // moonshot-v1 (대략)
-    xai:       { in: 0.3, out: 0.5 }       // grok-3-mini (대략)
-  }
+  // Per-model pricing (USD / 1M tokens) resolved from providers-config.
+  const pricing = { in: chosenModel.priceIn || 0, out: chosenModel.priceOut || 0 }
   const startedAt = Date.now()
   let attempts = 0
   let validated = null
@@ -156,7 +151,6 @@ export async function buildDraftWithAI(input) {
   const estInputTokens = realUsage?.inputTokens ?? Math.ceil(prompt.length / 3)
   const estOutputTokens = realUsage?.outputTokens ?? Math.ceil(lastResponseText.length / 3)
   const tokensMeasured = Boolean(realUsage)
-  const pricing = PRICING_USD_PER_M[providerKey] || { in: 0, out: 0 }
   const estCostUsd = (estInputTokens * pricing.in + estOutputTokens * pricing.out) / 1_000_000
 
   const lines = effectiveText
@@ -173,7 +167,7 @@ export async function buildDraftWithAI(input) {
     tokensMeasured,
     estCostUsd: Number(estCostUsd.toFixed(4)),
     provider: provider.label,
-    model: provider.defaultModel
+    model: chosenModel.id
   }
 
   return {
@@ -224,9 +218,10 @@ ${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.j
 - 제목·머리말·목록기호·JSON 없이 본문 문장만 출력.
 - 다른 섹션과 내용 중복 금지. 마침표로 끝나는 완결 문장만.`
 
+  const chosenModel = resolveModel(provider, input.model)
   const res = providerKey === 'anthropic'
-    ? await callAnthropic(provider, apiKey, prompt, { systemPrompt })
-    : await callOpenAICompatible(provider, apiKey, prompt, { systemPrompt })
+    ? await callAnthropic(provider, apiKey, prompt, { systemPrompt, model: chosenModel.id })
+    : await callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model: chosenModel.id })
 
   const body = String(res.text || '').trim()
   if (!body) throw createHttpError('AI가 빈 응답을 반환했습니다.', 502)

@@ -32,10 +32,26 @@ export function EditableDraft({
         {draft.summary && <p className="editable-draft-summary">{draft.summary}</p>}
       </div>
 
-      {isOptimistic && (
-        <p className="editable-draft-hint">AI 응답을 기다리는 중입니다. 도착하면 이 내용이 실제 초안으로 대체됩니다.</p>
-      )}
-
+      {isOptimistic ? (
+        <>
+          <p className="editable-draft-hint">AI가 초안을 작성하는 중입니다. 잠시 후 이 자리에 실제 내용이 채워집니다.</p>
+          <ol className="editable-sections" aria-busy="true">
+            {sections.map((section, index) => (
+              <li key={index} className="editable-section is-skeleton">
+                <div className="editable-section-toolbar">
+                  <span className="editable-section-num">{index + 1}</span>
+                  <span className="skeleton-heading">{section.heading}</span>
+                </div>
+                <div className="skeleton-lines">
+                  <span className="skeleton-line" />
+                  <span className="skeleton-line" />
+                  <span className="skeleton-line short" />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : (
       <ol className="editable-sections">
         {sections.map((section, index) => {
           const diagramSpec = (draft.diagrams || []).find((d) => d.afterSection === section.heading)
@@ -93,15 +109,18 @@ export function EditableDraft({
           )
         })}
       </ol>
+      )}
 
-      <div className="editable-draft-footer">
-        <button type="button" className="secondary-button" onClick={() => onAddSection(sections.length - 1)}>
-          + 섹션 추가
-        </button>
-        <button type="button" className="primary-button" onClick={onBuild} disabled={building || isOptimistic}>
-          {building ? 'HWPX 생성 중…' : '이 초안으로 HWPX 생성'}
-        </button>
-      </div>
+      {!isOptimistic && (
+        <div className="editable-draft-footer">
+          <button type="button" className="secondary-button" onClick={() => onAddSection(sections.length - 1)}>
+            + 섹션 추가
+          </button>
+          <button type="button" className="primary-button" onClick={onBuild} disabled={building}>
+            {building ? 'HWPX 생성 중…' : '이 초안으로 HWPX 생성'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

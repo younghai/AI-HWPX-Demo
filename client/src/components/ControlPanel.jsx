@@ -28,9 +28,22 @@ export function ControlPanel({
           currentFile={sourceFile}
           currentInsight={sourceInsight}
         />
-        <p className="helper">
-          HWP는 내용을 분석해 새 HWPX 초안을 만들고, HWPX는 업로드한 양식을 결과 문서 템플릿으로 재사용합니다.
-        </p>
+        {hasFile && sourceInsight.mode ? (
+          <div className={`mode-banner mode-banner--${sourceInsight.mode === 'hwpx-template' ? 'template' : 'source'}`} role="status">
+            <span className="mode-banner-icon" aria-hidden="true">
+              {sourceInsight.mode === 'hwpx-template' ? '🧩' : '✍️'}
+            </span>
+            <span className="mode-banner-text">
+              {sourceInsight.mode === 'hwpx-template'
+                ? <><strong>양식 유지 모드</strong> — 업로드한 HWPX 서식·표·레이아웃을 그대로 두고 본문만 AI로 채웁니다.</>
+                : <><strong>새 양식 생성 모드</strong> — HWP 원본 내용을 분석해 기본 HWPX 양식으로 새 문서를 만듭니다. 원본 서식은 유지되지 않습니다.</>}
+            </span>
+          </div>
+        ) : (
+          <p className="helper">
+            HWP는 내용을 분석해 새 HWPX 초안을 만들고, HWPX는 업로드한 양식을 결과 문서 템플릿으로 재사용합니다.
+          </p>
+        )}
       </div>
 
       <div className={`panel ${hasFile ? '' : 'panel--dimmed'}`} aria-disabled={!hasFile}>

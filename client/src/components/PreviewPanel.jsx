@@ -55,9 +55,12 @@ export const PreviewPanel = forwardRef(function PreviewPanel({
         <div className="preview-head">
           <p className="section-label">{sectionLabel}</p>
           {hasBuilt && !showEditor && (
-            <button type="button" className="preview-edit-again" onClick={onEditAgain}>
-              ← 초안 수정
-            </button>
+            <div className="preview-head-actions">
+              <span className="build-success-badge">✓ 생성 완료</span>
+              <button type="button" className="preview-edit-again" onClick={onEditAgain}>
+                ← 초안 수정
+              </button>
+            </div>
           )}
         </div>
         <div className="meta-grid">

@@ -35,7 +35,7 @@ export function estimateTemplateSlots(extractedText) {
   return count >= 3 && count <= 20 ? count : 0
 }
 
-export function buildOptimisticDraft({ sourceInsight, docType, companyName, goal, notes, targetTitle }) {
+export function buildOptimisticDraft({ sourceInsight, docType, companyName, targetTitle }) {
   const lines = String(sourceInsight.extractedText || '')
     .split('\n')
     .map((line) => line.trim())
@@ -46,19 +46,15 @@ export function buildOptimisticDraft({ sourceInsight, docType, companyName, goal
   const inferredTitle = targetTitle
     || (sourceInsight.fileName ? sourceInsight.fileName.replace(/\.(hwp|hwpx)$/i, '') : '문서 초안')
 
+  // Bodies are intentionally empty — the editor renders a skeleton for the
+  // optimistic draft instead of fabricated sentences that could be mistaken for
+  // real AI output (review UX-05). Headings come from the doc-type TOC so the
+  // structure is visible immediately.
   return {
     title: inferredTitle,
-    summary: `${companyName} 기준으로 업로드 문서 내용을 정리해 ${labelForDocType(docType)} 초안을 생성하는 중입니다.`,
+    summary: `${companyName} 기준으로 ${labelForDocType(docType)} 초안을 생성하는 중입니다…`,
     toc,
-    sections: toc.map((heading, index) => ({
-      heading,
-      body: [
-        excerpt[index] ? `원문 핵심 문장 "${excerpt[index]}"을 바탕으로 ${heading} 내용을 정리합니다.` : `${heading} 내용을 원문 흐름에 맞게 재구성합니다.`,
-        goal ? `생성 요청은 "${goal}" 입니다.` : '',
-        notes ? `추가 메모 "${notes}"를 반영합니다.` : '',
-        `${inferredTitle} 문서의 ${heading} 섹션 초안을 준비하고 있습니다.`
-      ].filter(Boolean).join(' ')
-    })),
+    sections: toc.map((heading) => ({ heading, body: '' })),
     sourceExcerpt: excerpt,
     engine: 'optimistic-preview'
   }

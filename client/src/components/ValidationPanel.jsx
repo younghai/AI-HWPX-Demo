@@ -37,6 +37,14 @@ export function ValidationPanel({ validation }) {
       ? 'warning'
       : 'ok'
 
+  // Plain-language headline so a non-technical user knows what the result means
+  // without reading V-codes (review PO-09/2-9).
+  const plainSummary = overallStatus === 'error'
+    ? `한컴 오피스에서 열 때 문제가 될 수 있는 항목 ${validation.errorCount}건이 있습니다. 아래 상세를 확인해 주세요.`
+    : overallStatus === 'warning'
+      ? `한컴 오피스에서 정상적으로 열립니다. 사소한 스타일 경고 ${validation.warningCount}건이 있지만 문서 사용에는 영향이 없습니다.`
+      : '한컴 오피스에서 정상적으로 열립니다. 모든 검증을 통과했습니다.'
+
   function toggle(axis) {
     setExpanded((curr) => {
       const next = new Set(curr)
@@ -65,9 +73,13 @@ export function ValidationPanel({ validation }) {
         </div>
       </header>
 
+      <p className="validation-plain">{plainSummary}</p>
+
       {total === 0 ? (
         <p className="validation-empty">생성된 HWPX 가 모든 검증 축을 통과했습니다.</p>
       ) : (
+        <>
+        <p className="validation-detail-label">기술 상세 (선택)</p>
         <ul className="validation-axis-list">
           {Object.entries(grouped).map(([axis, items]) => {
             const meta = AXIS_META[axis]
@@ -112,6 +124,7 @@ export function ValidationPanel({ validation }) {
             )
           })}
         </ul>
+        </>
       )}
     </div>
   )

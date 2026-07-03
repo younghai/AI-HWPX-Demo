@@ -1,10 +1,14 @@
 import { tryExtractJson, validateDraftPayload, ValidationError } from '../../shared/validate.js'
-import { buildToc, deriveTitle, labelForDocType } from '../../shared/docTypes.js'
+import { buildToc, deriveTitle, labelForDocType, getDocTypeMeta } from '../../shared/docTypes.js'
 import { AI_PROVIDERS, resolveModel } from '../lib/providers-config.js'
 import { createHttpError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from './ai.js'
 
-function buildPrompt({ effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots }) {
+function buildPrompt({ effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots, guidance, docFieldLines }) {
+  const typeBlock = [
+    guidance ? `문서 유형 지침: ${guidance}` : '',
+    docFieldLines || ''
+  ].filter(Boolean).join('\n')
   // v3 P1: 템플릿 본문 슬롯 수가 감지되면 해당 섹션 수만큼 필수 반환
   const sectionCountGuide = templateBodySlots && templateBodySlots > 0
     ? `업로드한 템플릿에는 약 ${templateBodySlots}개의 본문 단락 슬롯이 있습니다. 이를 고려해 섹션을 충분히(최소 5개 이상) 구성하되, 각 섹션의 body 에는 3~5개의 완결된 문장(마침표로 구분)을 포함하세요.`
@@ -46,6 +50,7 @@ ${effectiveText}
 원본 템플릿에 있는 섹션 제목과 구조를 그대로 따르되, 본문 내용만 새로 작성하세요.
 
 회사명: ${companyName}
+${typeBlock}
 ${goal ? `작성 목표: ${goal}` : ''}
 ${notes ? `추가 참고: ${notes}` : ''}
 
@@ -57,6 +62,7 @@ ${sharedDiagramSpec}`
 아래 조건에 맞는 "${title}" 제목의 ${docLabel}를 작성해 주세요.
 
 회사명: ${companyName}
+${typeBlock}
 ${goal ? `작성 목표: ${goal}` : ''}
 ${notes ? `추가 참고: ${notes}` : ''}
 
@@ -96,8 +102,19 @@ export async function buildDraftWithAI(input) {
   const docLabel = labelForDocType(docType)
   const templateBodySlots = Number(input.templateBodySlots) || null
 
+  const meta = getDocTypeMeta(docType)
+  const docFields = (input.docFields && typeof input.docFields === 'object') ? input.docFields : {}
+  const docFieldLines = meta.fields
+    .map((f) => {
+      const value = String(docFields[f.key] || '').trim()
+      return value ? `${f.label}: ${value}` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+
   const prompt = buildPrompt({
-    effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots
+    effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots,
+    guidance: meta.guidance, docFieldLines
   })
 
   const chosenModel = resolveModel(provider, input.model)

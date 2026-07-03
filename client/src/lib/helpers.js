@@ -1,6 +1,6 @@
-import { DOC_TYPES, buildToc, deriveTitle, labelForDocType } from '../../../shared/docTypes.js'
+import { DOC_TYPES, buildToc, deriveTitle, labelForDocType, getDocTypeMeta } from '../../../shared/docTypes.js'
 
-export { DOC_TYPES, buildToc, deriveTitle, labelForDocType }
+export { DOC_TYPES, buildToc, deriveTitle, labelForDocType, getDocTypeMeta }
 
 export function extractTextFromSvg(svg) {
   const parser = new DOMParser()

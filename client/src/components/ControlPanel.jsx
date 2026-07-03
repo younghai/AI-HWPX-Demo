@@ -1,4 +1,4 @@
-import { DOC_TYPES } from '../lib/helpers.js'
+import { DOC_TYPES, getDocTypeMeta } from '../lib/helpers.js'
 import { Uploader } from './Uploader.jsx'
 
 const GOAL_MAX = 400
@@ -9,6 +9,7 @@ export function ControlPanel({
   sourceFile,
   sourceInsight,
   docType, setDocType,
+  docFields = {}, setDocField,
   companyName, setCompanyName,
   targetTitle, setTargetTitle,
   goal, setGoal,
@@ -61,6 +62,16 @@ export function ControlPanel({
           </select>
           <small className="helper">생성할 문서의 성격을 선택하세요.</small>
         </label>
+        {getDocTypeMeta(docType).fields.map((field) => (
+          <label key={field.key}>
+            <span>{field.label}</span>
+            <input
+              value={docFields[field.key] || ''}
+              onChange={(e) => setDocField(field.key, e.target.value)}
+              placeholder={field.placeholder}
+            />
+          </label>
+        ))}
         {activeModels.length > 1 && (
           <label>
             <span>AI 모델</span>

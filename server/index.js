@@ -12,6 +12,7 @@ import historyRouter from './routes/history.js'
 import { createAuthRouter } from './routes/auth.js'
 import googleAuthRouter from './routes/googleAuth.js'
 import { generatedDirectory } from './services/hwpxBuilder.js'
+import { startGeneratedCleanup } from './lib/cleanup.js'
 
 const PORT = Number(process.env.PORT || 8792)
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5192'
@@ -31,6 +32,8 @@ app.use(samplesRouter)
 app.use(historyRouter)
 app.use(googleAuthRouter)
 app.use(createAuthRouter({ oauthBase: OAUTH_BASE, clientOrigin: CLIENT_ORIGIN }))
+
+startGeneratedCleanup(generatedDirectory)
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`v4 server listening on http://127.0.0.1:${PORT}`)

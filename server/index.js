@@ -15,6 +15,7 @@ import { createAuthRouter } from './routes/auth.js'
 import googleAuthRouter from './routes/googleAuth.js'
 import { generatedDirectory } from './services/hwpxBuilder.js'
 import { startGeneratedCleanup } from './lib/cleanup.js'
+import { requireSession } from './lib/authGuard.js'
 
 const PORT = Number(process.env.PORT || 8792)
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5192'
@@ -28,7 +29,9 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false 
 app.use(cors({ origin: CLIENT_ORIGIN, methods: ['GET', 'POST'], credentials: true }))
 app.use(cookieParser())
 app.use(express.json({ limit: '3mb' }))
-app.use('/generated', express.static(generatedDirectory))
+// Generated documents may contain user content — gate them behind the session
+// in protected mode (no-op in local mode). See review BE-04.
+app.use('/generated', requireSession, express.static(generatedDirectory))
 
 // Rate limiting: a generous global cap plus a strict cap on AI/spawn/cost routes
 // so an exposed deployment can't be driven into cost-blowup or DoS (review BE-06).

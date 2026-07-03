@@ -6,8 +6,9 @@ server/node_modules/
 # Build artifacts
 client/dist/
 
-# Generated HWPX output (per-run, do not track)
+# Generated HWPX output + private work dir (per-run, do not track)
 generated/
+.work/
 
 # Runtime / session state (OMC, Claude Code local settings, logs)
 .omc/

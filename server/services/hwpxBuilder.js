@@ -1,9 +1,10 @@
 import fs from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { createHttpError } from '../lib/errors.js'
-import { runProcess, slugify, sanitizeName } from '../lib/utils.js'
+import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { validateHwpx } from './validator.js'
 
@@ -13,11 +14,15 @@ const v4Root = path.resolve(__dirname, '..', '..')
 const scriptsDir = path.join(v4Root, 'scripts')
 const buildScript = path.join(scriptsDir, 'build_hwpx.py')
 const generatedDir = path.join(v4Root, 'generated')
+// Private work dir (NOT served) for uploaded originals + sections JSON, so they
+// are never exposed via /generated and can't collide across concurrent requests.
+const workDir = path.join(v4Root, '.work')
 
 const venvPython = path.join(v4Root, '.venv', 'bin', 'python3')
 const pythonCmd = existsSync(venvPython) ? venvPython : 'python3'
 
 await fs.mkdir(generatedDir, { recursive: true })
+await fs.mkdir(workDir, { recursive: true })
 
 export const generatedDirectory = generatedDir
 
@@ -60,14 +65,17 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
     .map((item) => item.trim())
     .filter(Boolean)
 
-  const outputName = `${slugify(title) || 'generated'}-${Date.now()}.hwpx`
+  // Unpredictable, collision-free output name (review BE-04/BE-12). The slug is
+  // kept as a human hint; the UUID prevents enumeration and same-ms collisions.
+  const outputName = `${slugify(title) || 'generated'}-${crypto.randomUUID()}.hwpx`
   const outputPath = path.join(generatedDir, outputName)
 
   let templatePath = null
   const sourceDocumentName = (sourceFile?.originalname || 'uploaded-document').normalize('NFC')
 
   if (sourceFile && sourceFile.originalname.toLowerCase().endsWith('.hwpx')) {
-    const uploadPath = path.join(generatedDir, `${Date.now()}-${sanitizeName(sourceFile.originalname)}`)
+    // Uploaded original goes to the private work dir, never the served dir.
+    const uploadPath = path.join(workDir, `${crypto.randomUUID()}.hwpx`)
     await fs.writeFile(uploadPath, sourceFile.buffer)
     templatePath = uploadPath
   }
@@ -82,7 +90,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
       const sections = JSON.parse(rawSections)
       const diagrams = JSON.parse(rawDiagrams || '[]').map((d) => ({ ...d, _diagram: true }))
       const combined = [...sections, ...diagrams]
-      sectionsJsonPath = path.join(generatedDir, `${Date.now()}-sections.json`)
+      sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
       await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
     } catch (err) {
       console.warn('sections JSON parse failed:', err.message)

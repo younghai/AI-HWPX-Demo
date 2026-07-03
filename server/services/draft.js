@@ -3,6 +3,14 @@ import { buildToc, deriveTitle, labelForDocType, getDocTypeMeta } from '../../sh
 import { AI_PROVIDERS, resolveModel } from '../lib/providers-config.js'
 import { createHttpError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from './ai.js'
+import { getValidAccessToken } from '../lib/oauthTokens.js'
+
+// Prefer a valid OAuth access token (refreshed if needed) for OAuth-connected
+// providers, falling back to the static API key. See review BE-05.
+async function resolveApiKey(provider, providerKey) {
+  const oauthToken = await getValidAccessToken(provider, providerKey)
+  return oauthToken || process.env[provider.envKey] || ''
+}
 
 function buildPrompt({ effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots, guidance, docFieldLines }) {
   const typeBlock = [
@@ -91,7 +99,7 @@ export async function buildDraftWithAI(input) {
     throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
   }
 
-  const apiKey = process.env[provider.envKey] || clientKey
+  const apiKey = (await resolveApiKey(provider, providerKey)) || clientKey
   if (!apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }
@@ -218,7 +226,7 @@ export async function regenerateSectionWithAI(input) {
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
 
-  const apiKey = process.env[provider.envKey]
+  const apiKey = await resolveApiKey(provider, providerKey)
   if (!apiKey) throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 입력해 주세요.`, 401)
 
   const docLabel = labelForDocType(docType)

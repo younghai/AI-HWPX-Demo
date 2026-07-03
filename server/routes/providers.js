@@ -4,6 +4,7 @@ import { writeEnvFile } from '../lib/env.js'
 import { sendError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from '../services/ai.js'
 import { requireSession } from '../lib/authGuard.js'
+import { hasOAuthToken } from '../lib/oauthTokens.js'
 
 const router = Router()
 
@@ -13,7 +14,7 @@ router.get('/api/providers', (_req, res) => {
     label: val.label,
     defaultModel: val.defaultModel,
     models: (val.models || []).map((m) => ({ id: m.id, label: m.label })),
-    configured: Boolean(process.env[val.envKey]),
+    configured: Boolean(process.env[val.envKey]) || hasOAuthToken(key),
     oauthSupported: Boolean(val.oauth && process.env[val.oauth?.clientIdEnv])
   }))
   res.json({ ok: true, providers: list })

@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { AI_PROVIDERS } from '../lib/providers-config.js'
-import { writeEnvFile } from '../lib/env.js'
 import { rememberState, consumeState, oauthResultPage } from '../lib/oauth.js'
+import { setOAuthToken } from '../lib/oauthTokens.js'
 
 export function createAuthRouter({ oauthBase, clientOrigin }) {
   const router = Router()
@@ -71,8 +71,13 @@ export function createAuthRouter({ oauthBase, clientOrigin }) {
       if (!tokenRes.ok || !tokenData.access_token) {
         return res.send(oauthResultPage(false, tokenData.error_description || tokenData.error || '토큰 교환에 실패했습니다.', clientOrigin))
       }
-      process.env[provider.envKey] = tokenData.access_token
-      await writeEnvFile({ [provider.envKey]: tokenData.access_token })
+      // Store in the OAuth token store (in-memory, with expiry + refresh), NOT
+      // the .env API-key slot — see lib/oauthTokens.js / review BE-05.
+      setOAuthToken(providerKey, {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresInSec: tokenData.expires_in
+      })
       res.send(oauthResultPage(true, `${provider.label} OAuth 연결 완료!`, clientOrigin))
     } catch (err) {
       res.send(oauthResultPage(false, `토큰 교환 오류: ${err.message}`, clientOrigin))

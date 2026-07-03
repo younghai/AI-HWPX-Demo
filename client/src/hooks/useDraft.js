@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { buildOptimisticDraft, triggerDownload } from '../lib/helpers.js'
+import { buildOptimisticDraft, triggerDownload, estimateTemplateSlots } from '../lib/helpers.js'
 
 export function useDraft({ setParseStatus }) {
   const [draft, setDraft] = useState(null)
@@ -31,13 +31,17 @@ export function useDraft({ setParseStatus }) {
     onOptimistic?.()
 
     try {
+      const templateBodySlots = sourceInsight.mode === 'hwpx-template'
+        ? estimateTemplateSlots(sourceInsight.extractedText)
+        : 0
       const response = await fetch('/api/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: sourceInsight.fileName,
           sourceText: sourceInsight.extractedText,
-          docType, companyName, goal, notes, targetTitle, aiProvider
+          docType, companyName, goal, notes, targetTitle, aiProvider,
+          templateBodySlots
         }),
         signal: controller.signal
       })
@@ -76,9 +80,12 @@ export function useDraft({ setParseStatus }) {
     setExportState({ loading: true, url: '', fileName: '', message: '' })
 
     try {
+      // Derive TOC from the (possibly edited/added/removed/reordered) section
+      // headings so manual edits always flow through to the built HWPX.
+      const toc = activeDraft.sections.map((s) => s.heading)
       const formData = new FormData()
       formData.append('title', activeDraft.title)
-      formData.append('toc', activeDraft.toc.join('\n'))
+      formData.append('toc', toc.join('\n'))
       formData.append('sections', JSON.stringify(activeDraft.sections))
       formData.append('diagrams', JSON.stringify(activeDraft.diagrams || []))
       formData.append('sourceFile', sourceFile)
@@ -125,5 +132,86 @@ export function useDraft({ setParseStatus }) {
     resetExport()
   }
 
-  return { draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll }
+  // ── Draft editing (review PO-01) ───────────────────────────────────────────
+  // All edits mark the draft as user-edited so downstream UI (labels, build)
+  // treats it as final content rather than an optimistic/AI placeholder.
+  function patchDraft(mutator) {
+    setDraft((current) => {
+      if (!current) return current
+      const next = mutator(current)
+      return next ? { ...next, engine: next.engine === 'optimistic-preview' ? next.engine : (next.engine || 'edited'), edited: true } : current
+    })
+  }
+
+  function updateSection(index, patch) {
+    patchDraft((d) => {
+      const sections = d.sections.map((s, i) => (i === index ? { ...s, ...patch } : s))
+      return { ...d, sections, toc: sections.map((s) => s.heading) }
+    })
+  }
+
+  function addSection(afterIndex) {
+    patchDraft((d) => {
+      const sections = [...d.sections]
+      const at = typeof afterIndex === 'number' ? afterIndex + 1 : sections.length
+      sections.splice(at, 0, { heading: '새 섹션', body: '' })
+      return { ...d, sections, toc: sections.map((s) => s.heading) }
+    })
+  }
+
+  function removeSection(index) {
+    patchDraft((d) => {
+      if (d.sections.length <= 1) return d
+      const sections = d.sections.filter((_, i) => i !== index)
+      return { ...d, sections, toc: sections.map((s) => s.heading) }
+    })
+  }
+
+  function moveSection(index, dir) {
+    patchDraft((d) => {
+      const target = index + dir
+      if (target < 0 || target >= d.sections.length) return d
+      const sections = [...d.sections]
+      ;[sections[index], sections[target]] = [sections[target], sections[index]]
+      return { ...d, sections, toc: sections.map((s) => s.heading) }
+    })
+  }
+
+  function updateTitle(title) {
+    patchDraft((d) => ({ ...d, title }))
+  }
+
+  async function regenerateSection(index, context) {
+    const current = draft
+    if (!current || !current.sections[index]) return
+    const section = current.sections[index]
+    updateSection(index, { regenerating: true })
+    try {
+      const response = await fetch('/api/regenerate-section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          heading: section.heading,
+          title: current.title,
+          otherHeadings: current.sections.filter((_, i) => i !== index).map((s) => s.heading),
+          ...context
+        })
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || '섹션 재생성에 실패했습니다.')
+      }
+      updateSection(index, { body: payload.body, regenerating: false })
+      return payload.body
+    } catch (error) {
+      updateSection(index, { regenerating: false })
+      setParseStatus(`섹션 재생성 실패: ${error.message}`)
+      return null
+    }
+  }
+
+  return {
+    draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll,
+    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection
+  }
 }

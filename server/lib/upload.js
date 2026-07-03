@@ -8,6 +8,10 @@ const ALLOWED_UPLOAD_MIME = new Set([
   'application/haansofthwp',
   'application/vnd.hancom.hwpx',
   'application/haansofthwpx',
+  // Hancom's own "+zip" HWPX media types (also what the sample loader tags files
+  // with in the browser). The magic-byte check below still enforces a real zip.
+  'application/hwp+zip',
+  'application/haansofthwp+zip',
   ''
 ])
 

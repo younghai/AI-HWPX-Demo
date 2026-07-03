@@ -4,6 +4,10 @@ import { extractTextFromSvg } from '../lib/helpers.js'
 
 const BUILT_INITIAL = { svgs: [], pageCount: 0, fileName: '', url: '' }
 
+// Full-document context extraction bounds (review PO-02).
+const MAX_CONTEXT_PAGES = 50
+const MAX_CONTEXT_CHARS = 12000
+
 export function useRhwp() {
   const docRef = useRef(null)
   const builtDocRef = useRef(null)
@@ -83,14 +87,24 @@ export function useRhwp() {
 
   async function enrichAdditionalPages({ document, totalPages, initialText, jobId }) {
     if (totalPages <= 1) return
-    const extractedPages = [initialText]
-    for (let i = 1; i < Math.min(totalPages, 3); i += 1) {
-      extractedPages.push(extractTextFromSvg(document.renderPageSvg(i)))
+    // Extract the whole document (not just 3 pages) so the AI sees the full
+    // source, capped by a char budget + hard page cap to keep the prompt sane
+    // and the UI responsive on very large files. See review PO-02.
+    const pages = [initialText]
+    let total = initialText.length
+    const pageLimit = Math.min(totalPages, MAX_CONTEXT_PAGES)
+    for (let i = 1; i < pageLimit && total < MAX_CONTEXT_CHARS; i += 1) {
+      if (parseJobRef.current !== jobId) return
+      const text = extractTextFromSvg(document.renderPageSvg(i))
+      pages.push(text)
+      total += text.length + 1
+      // Yield to the event loop periodically so a large doc doesn't freeze the UI.
+      if (i % 5 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
     }
     if (parseJobRef.current !== jobId) return
     setSourceInsight((current) => ({
       ...current,
-      extractedText: extractedPages.join('\n').trim()
+      extractedText: pages.join('\n').trim().slice(0, MAX_CONTEXT_CHARS)
     }))
   }
 

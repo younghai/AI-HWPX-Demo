@@ -104,6 +104,8 @@ export async function buildDraftWithAI(input) {
     ? callAnthropic(provider, apiKey, prompt)
     : callOpenAICompatible(provider, apiKey, prompt)
 
+  let realUsage = null
+
   // v4: AI 비용/시간 측정용 (provider별 대략적 단가 — 정확한 토큰은 응답에 따라 다름)
   // 단위: USD per 1M tokens (input, output) — 2025-10 시점 공개 단가 근사
   const PRICING_USD_PER_M = {
@@ -121,8 +123,10 @@ export async function buildDraftWithAI(input) {
     attempts += 1
     let text
     try {
-      text = await callOnce()
+      const res = await callOnce()
+      text = res.text
       lastResponseText = text
+      if (res.usage) realUsage = res.usage
     } catch (err) {
       lastError = createHttpError(`AI 호출 실패: ${err.message}`, 502)
       continue
@@ -147,9 +151,11 @@ export async function buildDraftWithAI(input) {
     throw lastError || createHttpError('AI 응답을 처리할 수 없습니다.', 502)
   }
   const elapsedMs = Date.now() - startedAt
-  // 토큰 추정: 영어 4 chars/token, 한국어 1.5 chars/token. 보수적으로 prompt/answer 길이 / 3.
-  const estInputTokens = Math.ceil(prompt.length / 3)
-  const estOutputTokens = Math.ceil(lastResponseText.length / 3)
+  // Prefer provider-reported token counts; fall back to a char-based estimate
+  // (한국어 ≈ 1.5, 영어 ≈ 4 chars/token → conservative /3) when absent (review PO-05).
+  const estInputTokens = realUsage?.inputTokens ?? Math.ceil(prompt.length / 3)
+  const estOutputTokens = realUsage?.outputTokens ?? Math.ceil(lastResponseText.length / 3)
+  const tokensMeasured = Boolean(realUsage)
   const pricing = PRICING_USD_PER_M[providerKey] || { in: 0, out: 0 }
   const estCostUsd = (estInputTokens * pricing.in + estOutputTokens * pricing.out) / 1_000_000
 
@@ -164,8 +170,10 @@ export async function buildDraftWithAI(input) {
     attempts,
     estInputTokens,
     estOutputTokens,
+    tokensMeasured,
     estCostUsd: Number(estCostUsd.toFixed(4)),
-    provider: provider.label
+    provider: provider.label,
+    model: provider.defaultModel
   }
 
   return {
@@ -178,4 +186,49 @@ export async function buildDraftWithAI(input) {
     sourceExcerpt: lines.slice(0, 8),
     engine: provider.label
   }
+}
+
+// Regenerate the body of a single section (review PO-01, section-level regenerate).
+// Returns plain body text — no JSON wrapper — so the OpenAI-compatible path is
+// given a plain-text system prompt instead of the JSON-forcing default.
+export async function regenerateSectionWithAI(input) {
+  const heading = String(input.heading || '').trim()
+  const title = String(input.title || '문서').trim()
+  const docType = String(input.docType || 'report').trim()
+  const companyName = String(input.companyName || '회사명').trim()
+  const goal = String(input.goal || '').trim()
+  const notes = String(input.notes || '').trim()
+  const sourceText = String(input.sourceText || '').trim()
+  const otherHeadings = Array.isArray(input.otherHeadings) ? input.otherHeadings.filter(Boolean) : []
+  const providerKey = String(input.aiProvider || 'anthropic').trim()
+
+  if (!heading) throw createHttpError('섹션 제목이 비어 있습니다.', 422)
+
+  const provider = AI_PROVIDERS[providerKey]
+  if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
+
+  const apiKey = process.env[provider.envKey]
+  if (!apiKey) throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 입력해 주세요.`, 401)
+
+  const docLabel = labelForDocType(docType)
+  const systemPrompt = '당신은 한국어 공식 문서 작성 전문가입니다. 요청한 섹션의 본문 텍스트만 출력하세요.'
+  const prompt = `"${title}" ${docLabel}의 "${heading}" 섹션 본문만 새로 작성하세요.
+${sourceText ? `\n원문 참고:\n---\n${sourceText.slice(0, 4000)}\n---\n` : ''}
+회사명: ${companyName}
+${goal ? `작성 목표: ${goal}` : ''}
+${notes ? `추가 참고: ${notes}` : ''}
+${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.join(', ')}` : ''}
+
+규칙:
+- "${heading}" 섹션에 해당하는 본문만 3~5개의 완결된 문장으로 작성.
+- 제목·머리말·목록기호·JSON 없이 본문 문장만 출력.
+- 다른 섹션과 내용 중복 금지. 마침표로 끝나는 완결 문장만.`
+
+  const res = providerKey === 'anthropic'
+    ? await callAnthropic(provider, apiKey, prompt, { systemPrompt })
+    : await callOpenAICompatible(provider, apiKey, prompt, { systemPrompt })
+
+  const body = String(res.text || '').trim()
+  if (!body) throw createHttpError('AI가 빈 응답을 반환했습니다.', 502)
+  return { body }
 }

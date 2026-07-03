@@ -7,6 +7,8 @@ import { createHttpError } from '../lib/errors.js'
 import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { validateHwpx } from './validator.js'
+import { logger } from '../lib/logger.js'
+import { record } from '../lib/metrics.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -93,7 +95,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
       sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
       await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
     } catch (err) {
-      console.warn('sections JSON parse failed:', err.message)
+      logger.warn({ err: err.message }, 'sections JSON parse failed')
     }
   }
 
@@ -118,6 +120,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
       }
     : undefined
 
+  const buildStarted = Date.now()
   let result
   try {
     result = await runProcess(pythonCmd, args, v4Root, { env: pythonEnv })
@@ -125,6 +128,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
     if (templatePath) fs.unlink(templatePath).catch(() => {})
     if (sectionsJsonPath) fs.unlink(sectionsJsonPath).catch(() => {})
   }
+  record('hwpx_build', { ok: result.ok, ms: Date.now() - buildStarted })
 
   if (!result.ok) {
     // Clean up any partially-written output so it is never served (review PY-03).
@@ -132,7 +136,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
     const { message, status } = parseWorkerError(result.stdout)
     // Never surface raw stderr/traceback to the user (CLAUDE.md R4). The full
     // stderr is preserved in server logs for debugging.
-    if (result.stderr) console.error('[build_hwpx] worker failed:', result.stderr)
+    if (result.stderr) logger.error({ stderr: result.stderr }, 'build_hwpx worker failed')
     throw createHttpError(message, status)
   }
 

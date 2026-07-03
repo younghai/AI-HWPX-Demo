@@ -4,6 +4,7 @@ import { AI_PROVIDERS, resolveModel } from '../lib/providers-config.js'
 import { createHttpError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from './ai.js'
 import { getValidAccessToken } from '../lib/oauthTokens.js'
+import { record } from '../lib/metrics.js'
 
 // Prefer a valid OAuth access token (refreshed if needed) for OAuth-connected
 // providers, falling back to the static API key. See review BE-05.
@@ -168,9 +169,11 @@ export async function buildDraftWithAI(input) {
     }
   }
   if (!validated) {
+    record('ai_draft', { ok: false, ms: Date.now() - startedAt })
     throw lastError || createHttpError('AI 응답을 처리할 수 없습니다.', 502)
   }
   const elapsedMs = Date.now() - startedAt
+  record('ai_draft', { ok: true, ms: elapsedMs })
   // Prefer provider-reported token counts; fall back to a char-based estimate
   // (한국어 ≈ 1.5, 영어 ≈ 4 chars/token → conservative /3) when absent (review PO-05).
   const estInputTokens = realUsage?.inputTokens ?? Math.ceil(prompt.length / 3)

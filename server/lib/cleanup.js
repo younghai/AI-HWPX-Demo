@@ -1,5 +1,6 @@
 import path from 'path'
 import fs from 'fs/promises'
+import { logger } from './logger.js'
 
 const TTL_MS = Number(process.env.GENERATED_TTL_MS) || 24 * 60 * 60 * 1000  // 24h
 const MAX_TOTAL_BYTES = Number(process.env.GENERATED_MAX_BYTES) || 500 * 1024 * 1024  // 500MB
@@ -54,9 +55,9 @@ export async function sweepGenerated(dir, { now }) {
 // Start the recurring sweep. Caller passes a clock so the sweep is testable and
 // so the startup pass runs immediately. Timer is unref'd so it never blocks exit.
 export function startGeneratedCleanup(dir) {
-  const run = () => sweepGenerated(dir, { now: Date.now() }).catch((err) => {
-    console.error('[cleanup] generated sweep failed:', err.message)
-  })
+  const run = () => sweepGenerated(dir, { now: Date.now() })
+    .then((r) => { if (r.removed) logger.info({ removed: r.removed }, 'generated sweep') })
+    .catch((err) => logger.error({ err: err.message }, 'generated sweep failed'))
   run()
   const timer = setInterval(run, SWEEP_INTERVAL_MS)
   timer.unref?.()

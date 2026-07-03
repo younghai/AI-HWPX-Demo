@@ -4,6 +4,8 @@ import express from 'express'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import crypto from 'crypto'
+import pinoHttp from 'pino-http'
 
 import healthRouter from './routes/health.js'
 import providersRouter from './routes/providers.js'
@@ -17,10 +19,18 @@ import { generatedDirectory } from './services/hwpxBuilder.js'
 import { startGeneratedCleanup } from './lib/cleanup.js'
 import { requireSession } from './lib/authGuard.js'
 import { PORT, CLIENT_ORIGIN, OAUTH_REDIRECT_BASE } from './lib/config.js'
+import { logger } from './lib/logger.js'
+import { snapshot } from './lib/metrics.js'
 
 const OAUTH_BASE = OAUTH_REDIRECT_BASE
 
 const app = express()
+// Structured request logging with a per-request id; skip the noisy health poll.
+app.use(pinoHttp({
+  logger,
+  genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
+  autoLogging: { ignore: (req) => req.url === '/api/health' }
+}))
 // helmet security headers. CSP is disabled because the OAuth result pages rely
 // on inline scripts; the other protections (HSTS, noSniff, frameguard, …) apply.
 // A tailored CSP is a follow-up refinement.
@@ -53,6 +63,9 @@ for (const p of ['/api/generate-draft', '/api/regenerate-section', '/api/export-
   app.use(p, costLimiter)
 }
 
+// Local observability snapshot (counts + avg latency for AI/build ops).
+app.get('/api/metrics', (_req, res) => res.json({ ok: true, metrics: snapshot() }))
+
 app.use(healthRouter)
 app.use(providersRouter)
 app.use(draftRouter)
@@ -65,5 +78,5 @@ app.use(createAuthRouter({ oauthBase: OAUTH_BASE, clientOrigin: CLIENT_ORIGIN })
 startGeneratedCleanup(generatedDirectory)
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`v4 server listening on http://127.0.0.1:${PORT}`)
+  logger.info({ port: PORT, authMode: process.env.AUTH_MODE || 'local' }, `AI HWP server listening on http://127.0.0.1:${PORT}`)
 })

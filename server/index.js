@@ -41,7 +41,13 @@ const jsonLimit = (message) => ({
   legacyHeaders: false,
   handler: (_req, res) => res.status(429).json({ ok: false, code: 'RATE_LIMITED', error: message })
 })
-const globalLimiter = rateLimit({ ...jsonLimit('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'), max: 300 })
+// Global cap accommodates a polling UI (providers/history/me); health is exempt
+// so monitoring never trips it. The cost limiter below stays strict on AI routes.
+const globalLimiter = rateLimit({
+  ...jsonLimit('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'),
+  max: 1000,
+  skip: (req) => req.path === '/api/health'
+})
 const costLimiter = rateLimit({ ...jsonLimit('AI 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'), max: 30 })
 app.use('/api/', globalLimiter)
 for (const p of ['/api/generate-draft', '/api/regenerate-section', '/api/export-hwpx', '/api/test-provider']) {

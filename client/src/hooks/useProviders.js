@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const STORAGE_KEY = 'ai-hwp-provider'
 const MODEL_STORAGE_KEY = 'ai-hwp-model-by-provider'
@@ -46,6 +46,13 @@ export function useProviders(onError) {
     persistProvider(resolved)
   }, [aiProvider])
 
+  // Keep onError in a ref so `refresh` stays referentially stable. Otherwise a
+  // new inline onError each render → new refresh → the mount effect re-fires →
+  // setProviders → re-render → an infinite /api/providers fetch loop (surfaced
+  // by the rate limiter). See review FE-03.
+  const onErrorRef = useRef(onError)
+  useEffect(() => { onErrorRef.current = onError }, [onError])
+
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/providers')
@@ -64,10 +71,10 @@ export function useProviders(onError) {
       }
       return data.providers || []
     } catch (err) {
-      onError?.(err)
+      onErrorRef.current?.(err)
       return []
     }
-  }, [onError])
+  }, [])
 
   useEffect(() => {
     refresh()

@@ -19,6 +19,67 @@ function loadSavedDraft() {
   return null
 }
 
+// Human-readable status for a streaming progress event (review B2).
+function phaseLabel(p) {
+  const secs = p?.elapsedMs ? ` · ${Math.round(p.elapsedMs / 1000)}초` : ''
+  switch (p?.phase) {
+    case 'prompt': return `AI 프롬프트를 구성했습니다. 응답을 기다리는 중…${secs}`
+    case 'calling': return p.attempt > 1
+      ? `AI 응답이 지연되어 재시도 중입니다 (${p.attempt}차)…${secs}`
+      : `${p.provider || 'AI'}가 초안을 작성하는 중입니다…${secs}`
+    case 'parsing': return `AI 응답을 검증하는 중…${secs}`
+    default: return `생성 중…${secs}`
+  }
+}
+
+// POST to the SSE stream endpoint and parse progress/result/error events.
+// Throws Error('stream-unavailable') when the transport itself can't stream
+// (so the caller can safely fall back to the plain JSON endpoint); a real
+// generation error arrives as an SSE `error` event and is thrown as-is (never
+// retried, to avoid a second AI charge).
+async function streamGenerateDraft(body, signal, onPhase) {
+  let res
+  try {
+    res = await fetch('/api/generate-draft/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+    throw new Error('stream-unavailable')
+  }
+  if (!res.ok || !res.body) throw new Error('stream-unavailable')
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let result = null
+  let genError = null
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let sep
+    while ((sep = buf.indexOf('\n\n')) !== -1) {
+      const raw = buf.slice(0, sep)
+      buf = buf.slice(sep + 2)
+      const ev = (raw.match(/^event:\s*(.+)$/m) || [])[1] || 'message'
+      const dataLine = (raw.match(/^data:\s*(.+)$/m) || [])[1]
+      if (!dataLine) continue
+      let data
+      try { data = JSON.parse(dataLine) } catch { continue }
+      if (ev === 'progress') onPhase?.(data)
+      else if (ev === 'result') result = data
+      else if (ev === 'error') genError = new Error(data.error || '초안 생성에 실패했습니다.')
+    }
+  }
+  if (genError) throw genError
+  if (!result?.draft) throw new Error('stream-unavailable')
+  return result.draft
+}
+
 export function useDraft({ setParseStatus }) {
   const [draft, setDraft] = useState(null)
   const [draftLoading, setDraftLoading] = useState(false)
@@ -77,26 +138,37 @@ export function useDraft({ setParseStatus }) {
       const templateBodySlots = sourceInsight.mode === 'hwpx-template'
         ? estimateTemplateSlots(sourceInsight.extractedText)
         : 0
-      const response = await fetch('/api/generate-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: sourceInsight.fileName,
-          sourceText: sourceInsight.extractedText,
-          docType, companyName, goal, notes, targetTitle, aiProvider,
-          docFields: docFields || {},
-          model: aiModel,
-          templateBodySlots
-        }),
-        signal: controller.signal
-      })
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || '초안 생성에 실패했습니다.')
+      const body = {
+        fileName: sourceInsight.fileName,
+        sourceText: sourceInsight.extractedText,
+        docType, companyName, goal, notes, targetTitle, aiProvider,
+        docFields: docFields || {},
+        model: aiModel,
+        templateBodySlots
       }
-      setDraft(payload.draft)
+
+      // Stream progress (B2); on transport failure fall back to the plain JSON
+      // endpoint. A real generation error is re-thrown by streamGenerateDraft
+      // (not 'stream-unavailable'), so it is NOT retried here.
+      let nextDraft
+      try {
+        nextDraft = await streamGenerateDraft(body, controller.signal, (p) => setParseStatus(phaseLabel(p)))
+      } catch (streamErr) {
+        if (streamErr.message !== 'stream-unavailable') throw streamErr
+        const response = await fetch('/api/generate-draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || '초안 생성에 실패했습니다.')
+        nextDraft = payload.draft
+      }
+
+      setDraft(nextDraft)
       setParseStatus('업로드 문서를 바탕으로 새 문서 초안이 생성되었고, 오른쪽 미리보기에 바로 반영되었습니다.')
-      return payload.draft
+      return nextDraft
     } catch (error) {
       if (error.name === 'AbortError') return null
       setDraft(null)

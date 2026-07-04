@@ -62,7 +62,7 @@ const globalLimiter = rateLimit({
 })
 const costLimiter = rateLimit({ ...jsonLimit('AI 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'), max: 30 })
 app.use('/api/', globalLimiter)
-for (const p of ['/api/generate-draft', '/api/regenerate-section', '/api/export-hwpx', '/api/test-provider']) {
+for (const p of ['/api/generate-draft', '/api/generate-draft/stream', '/api/regenerate-section', '/api/export-hwpx', '/api/test-provider']) {
   app.use(p, costLimiter)
 }
 

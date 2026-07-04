@@ -82,7 +82,10 @@ ${fallbackToc.map((item, i) => `${i + 1}. ${item}`).join('\n')}
 ${sharedDiagramSpec}`
 }
 
-export async function buildDraftWithAI(input) {
+export async function buildDraftWithAI(input, { onProgress } = {}) {
+  // Optional progress sink for the streaming route (review B2). No-op for the
+  // plain JSON endpoint. Kept best-effort — a throwing sink never breaks generation.
+  const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
   const sourceText = String(input.sourceText || '').trim()
   const docType = String(input.docType || 'report').trim()
   const companyName = String(input.companyName || '회사명').trim()
@@ -126,6 +129,7 @@ export async function buildDraftWithAI(input) {
     effectiveText, hasUploadedTemplate, title, docLabel, companyName, goal, notes, fallbackToc, templateBodySlots,
     guidance: meta.guidance, docFieldLines
   })
+  emit({ phase: 'prompt' })
 
   const chosenModel = resolveModel(provider, input.model)
   const callOnce = () => {
@@ -153,6 +157,7 @@ export async function buildDraftWithAI(input) {
   let lastResponseText = ''
   for (let attempt = 0; attempt < 2; attempt += 1) {
     attempts += 1
+    emit({ phase: 'calling', attempt: attempts, provider: provider.label, model: chosenModel.id })
     let text
     try {
       const res = await callOnce()
@@ -163,6 +168,7 @@ export async function buildDraftWithAI(input) {
       lastError = createHttpError(`AI 호출 실패: ${err.message}`, 502)
       continue
     }
+    emit({ phase: 'parsing', attempt: attempts })
     const parsed = tryExtractJson(text)
     if (!parsed) {
       lastError = createHttpError('AI 응답에서 JSON을 추출할 수 없습니다.', 502)

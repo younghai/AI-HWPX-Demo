@@ -14,6 +14,32 @@ router.post('/api/generate-draft', requireSession, async (req, res) => {
   }
 })
 
+// Streaming variant (review B2): emits SSE progress events (phase/attempt/elapsed)
+// during generation, then a final `result` or `error` event. The client falls
+// back to the plain JSON endpoint above if streaming is unavailable.
+router.post('/api/generate-draft/stream', requireSession, async (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  })
+  const started = Date.now()
+  const send = (event, data) => {
+    if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+  }
+  try {
+    const draft = await buildDraftWithAI(req.body || {}, {
+      onProgress: (evt) => send('progress', { ...evt, elapsedMs: Date.now() - started })
+    })
+    send('result', { ok: true, draft })
+  } catch (error) {
+    send('error', { ok: false, error: error.message || '초안 생성에 실패했습니다.' })
+  } finally {
+    res.end()
+  }
+})
+
 router.post('/api/regenerate-section', requireSession, async (req, res) => {
   try {
     const { body } = await regenerateSectionWithAI(req.body || {})

@@ -42,7 +42,7 @@
 - 단순히 `t_nodes[0].text = new` 만 하면 나머지 t-node / run 의 stale 텍스트가 시각적으로 겹침
 - `_normalize_paragraph()` 사용 강제 — 직접 `.text = ` 금지
 - 테이블 래퍼 단락은 skip (실제 텍스트는 셀 내부에 있음)
-- **실수 이력**: "폰트 HY헤드라인M, 크기 18" 같은 템플릿 보일러플레이트가 제목 옆에 겹쳐 렌더됨
+- **실수 이력**: "폰트 HY헤드라인M, 크기 18" 같은 템플릿 보일러플레이트가 제목 옆에 겹쳐 렌더됨. 2026-07-04: 같은 문구가 정본 gonmun.hwpx의 unmapped 부제 문단에 남아 **모든 생성 문서에 부제로 노출** → 정본에서 제거 + 출고 템플릿 위생 pytest 가드(`test_shipped_templates_have_no_font_guide_boilerplate`) 추가
 
 ### R6. AI 섹션 개수 ↔ 템플릿 body 슬롯 개수 불일치
 - AI가 N 섹션을 주면 HWPX에도 정확히 N 섹션만 반영 (pad 금지, 중복 금지)

@@ -204,6 +204,31 @@ def test_build_parity_fills_bodies_no_placeholder_leak(tmp_path: Path):
     assert "MARKER_BETA" in section_xml
     # R6: template's own sample sentence must not leak through (no placeholder bleed)
     assert "시장 내 경쟁력" not in section_xml
+    # R5 변종: 제목 아래 unmapped 부제 문단의 폰트 안내 문구도 누수 금지
+    assert FONT_GUIDE_BOILERPLATE not in section_xml
+
+
+# 제목 블록의 안내 문구. 어떤 슬롯에도 매핑되지 않는 문단이라 빌드가 정리하지
+# 못하고 모든 생성 문서에 부제로 노출됐다 (QA 2026-07-04). 정본과 샘플이 다시
+# 오염되면 즉시 잡는다.
+FONT_GUIDE_BOILERPLATE = "폰트 HY헤드라인M, 크기 18"
+
+
+def test_shipped_templates_have_no_font_guide_boilerplate():
+    shipped = [REPO_ROOT / "templates" / "gonmun.hwpx"] + sorted(
+        (REPO_ROOT / "templates" / "samples").glob("*-sample.hwpx")
+    )
+    assert len(shipped) >= 5, f"expected gonmun + 4 samples, got {[f.name for f in shipped]}"
+    for f in shipped:
+        with zipfile.ZipFile(f) as zf:
+            for name in zf.namelist():
+                try:
+                    text = zf.read(name).decode("utf-8")
+                except UnicodeDecodeError:
+                    continue
+                assert FONT_GUIDE_BOILERPLATE not in text, (
+                    f"{f.name}:{name} 에 폰트 안내 보일러플레이트가 남아 있음"
+                )
 
 
 # ── B1: client pre-rendered diagram PNG is used byte-for-byte ─────────────────

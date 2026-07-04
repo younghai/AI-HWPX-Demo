@@ -8,6 +8,26 @@
 
 ---
 
+## 2026-07-04 — 정본 템플릿의 폰트 안내 문구가 모든 생성 문서에 부제로 노출
+
+### What happened
+- 브라우저 QA에서 생성 문서 제목 바로 아래 "폰트 HY헤드라인M, 크기 18" 부제가 미리보기·다운로드 바이트 모두에서 발견
+- `templates/gonmun.hwpx`(정본) + 샘플 4종 전부 해당 → 모든 생성 경로에서 누수
+
+### Why
+- gonmun.hwpx 제목 블록 2번째 문단이 원본 한글 양식의 "작성 안내" 텍스트
+- `apply_smart_replacements` 분류(제목/메타/헤딩/본문) 어디에도 속하지 않는 unmapped 문단이라 빌드가 손대지 않고 그대로 통과
+
+### Fix
+- 정본 zip에서 해당 t-node 텍스트만 비움 (문단 구조·lineseg 보존 — 빈 문단은 분류 루프에서 스킵되므로 안전) + `Preview/PrvText.txt` 동일 정리
+- `gonmun-sample.hwpx` 재복사 + report/proposal/minutes 샘플 재생성 (`gen_sample_templates.py`, 결정적)
+
+### Prevention
+- `scripts/tests/test_pipeline.py::test_shipped_templates_have_no_font_guide_boilerplate` — 출고 템플릿 5종의 전 zip 엔트리 스캔
+- 기존 parity 테스트에도 해당 문구 부재 assert 추가 (`CLAUDE.md` R5 실수 이력 갱신)
+
+---
+
 ## 2026-04-26 — v4 문서에 v2/v3 버전 식별자 잔여
 
 ### What happened

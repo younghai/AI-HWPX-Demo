@@ -27,8 +27,11 @@ MUTED  = "#78716c"
 ACCENT = "#b5523a"
 LINK   = "#2563eb"
 RULE   = "rgba(28,25,23,0.12)"
-FONT   = "Arial, sans-serif"
-MONO   = "Courier New, monospace"
+# MUST stay byte-identical to D.FONT / D.MONO in client/src/lib/diagrams.js.
+# The client PNG is authoritative (review B1); this cairosvg fallback must render
+# the same diagram. Parity is enforced by client/src/test/diagram-parity.test.js.
+FONT   = "'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif"
+MONO   = "'D2Coding', 'Courier New', monospace"
 
 # HWP units: 1 mm = 283.46 HWPU
 MM = 283.46

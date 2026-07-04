@@ -5,7 +5,13 @@ const xe = escapeXml
 const D = {
   PAPER: '#faf7f2', INK: '#1c1917', MUTED: '#78716c',
   ACCENT: '#b5523a', RULE: 'rgba(28,25,23,0.12)',
-  FONT: 'Arial, sans-serif', MONO: 'Courier New, monospace',
+  // Korean-capable font stack so diagram labels render in a real Hangul face
+  // (not the OS emergency fallback that plain 'Arial' triggers). MUST stay
+  // byte-identical to FONT/MONO in scripts/diagram_templates.py — the client
+  // PNG is authoritative, and the cairosvg fallback must match it. The parity
+  // test (client/src/test/diagram-parity.test.js) enforces this.
+  FONT: "'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif",
+  MONO: "'D2Coding', 'Courier New', monospace",
   W: 605, H: 302
 }
 

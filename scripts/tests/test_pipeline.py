@@ -243,6 +243,43 @@ def test_diagram_png_bytes_rejects_bogus_pngpath(tmp_path: Path):
     assert out is None or out[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+# ── C1 regression guard: table structure survives a build ────────────────────
+# The gonmun template has 2 tables / 6 cells, and its TITLE actually lives inside
+# a table cell. This locks the current behavior so any future "표 셀 치환" work
+# (label/value form-filling) can't silently corrupt tables or the title mapping.
+@pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
+def test_table_structure_survives_build(tmp_path: Path):
+    import json, subprocess
+    import sys as _sys
+
+    sections = [
+        {"heading": "개요 or 목적", "body": "TBL_MARKER_A 개요 본문."},
+        {"heading": "추진방안 or 본문", "body": "TBL_MARKER_B 추진 본문."},
+    ]
+    sj = tmp_path / "s.json"
+    sj.write_text(json.dumps(sections, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "out.hwpx"
+    r = subprocess.run(
+        [_sys.executable, str(REPO_ROOT / "scripts" / "build_hwpx.py"),
+         "--template", "gonmun", "--output", str(out),
+         "--title", "TBL_TITLE_MARK", "--toc", "개요 or 목적\n추진방안 or 본문",
+         "--sections-json", str(sj), "--doc-date", "2026.01.01"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    with zipfile.ZipFile(out) as zf:
+        section_xml = zf.read("Contents/section0.xml").decode("utf-8")
+
+    # Tables are preserved, not destroyed, by the replacement pass.
+    assert section_xml.count("<hp:tbl") == 2
+    assert section_xml.count("<hp:tc") == 6
+    # The title (which lives in a table cell) was replaced with the given title.
+    assert "TBL_TITLE_MARK" in section_xml
+    # AI bodies flowed in.
+    assert "TBL_MARKER_A" in section_xml and "TBL_MARKER_B" in section_xml
+
+
 # ── PY-P2: --doc-date makes output deterministic ─────────────────────────────
 @pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
 def test_doc_date_is_deterministic(tmp_path: Path):

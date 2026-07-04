@@ -135,13 +135,18 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
   }
 
+  // Diagram embed report (review D2): the worker writes requested/embedded/skipped
+  // here so we can surface "N/M개 반영" and warn on silent drops.
+  const reportJsonPath = path.join(workDir, `${crypto.randomUUID()}-report.json`)
+
   const args = [
     buildScript,
     '--template', 'gonmun',
     '--output', outputPath,
     '--title', title,
     '--toc', toc.join('\n'),
-    '--source-document', sourceDocumentName
+    '--source-document', sourceDocumentName,
+    '--report-json', reportJsonPath
   ]
   if (templatePath) args.push('--template-file', templatePath)
   if (sectionsJsonPath) args.push('--sections-json', sectionsJsonPath)
@@ -158,11 +163,18 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
 
   const buildStarted = Date.now()
   let result
+  let diagramReport = null
   try {
     result = await runProcess(pythonCmd, args, v4Root, { env: pythonEnv })
+    try {
+      diagramReport = JSON.parse(await fs.readFile(reportJsonPath, 'utf-8'))
+    } catch {
+      diagramReport = null // report is best-effort; absence never fails the build
+    }
   } finally {
     if (templatePath) fs.unlink(templatePath).catch(() => {})
     if (sectionsJsonPath) fs.unlink(sectionsJsonPath).catch(() => {})
+    fs.unlink(reportJsonPath).catch(() => {})
     for (const p of diagramPngPaths) fs.unlink(p).catch(() => {})
   }
   record('hwpx_build', { ok: result.ok, ms: Date.now() - buildStarted })
@@ -192,6 +204,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     message: templatePath
       ? '업로드한 HWPX 양식을 기준으로 새 문서를 생성했습니다.'
       : '업로드한 문서 내용을 바탕으로 기본 HWPX 양식의 새 문서를 생성했습니다.',
-    validation
+    validation,
+    diagramReport
   }
 }

@@ -130,6 +130,7 @@ textarea {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
 }
@@ -1056,6 +1057,8 @@ small.helper {
   }
   .topbar-actions {
     align-self: flex-end;
+    justify-content: flex-end;
+    max-width: 100%;
   }
   .workspace {
     grid-template-columns: 1fr;

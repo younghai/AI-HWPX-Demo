@@ -63,8 +63,10 @@ export default function App() {
     parseFile,
     builtPreview,
     renderBuiltHwpx,
-    clearBuiltPreview
+    clearBuiltPreview,
+    exportBuiltPdf
   } = useRhwp()
+  const [pdfBusy, setPdfBusy] = useState(false)
   const {
     draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll,
     updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection,
@@ -202,6 +204,21 @@ export default function App() {
     downloadBuilt()
   }
 
+  async function handleDownloadPdf() {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    try {
+      const ok = await exportBuiltPdf(exportState.fileName)
+      if (ok) success('PDF를 내려받았습니다. (미리보기 기준 — 원본 서식은 HWPX가 정확합니다)')
+      else errorToast('PDF로 변환할 문서가 없습니다. 먼저 HWPX를 생성해 주세요.')
+    } catch (err) {
+      console.warn('pdf export failed', err)
+      errorToast('PDF 변환에 실패했습니다.')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   const showEmptyState = !sourceFile && !draft && !builtPreview.svgs.length
   const showEditor = Boolean(draft) && (editing || !builtPreview.svgs.length)
 
@@ -241,6 +258,9 @@ export default function App() {
           activeModels={activeModels} aiModel={aiModel} setAiModel={setAiModel}
           onGenerate={handleGenerate}
           onDownload={handleDownload}
+          onDownloadPdf={handleDownloadPdf}
+          canDownloadPdf={builtPreview.svgs.length > 0}
+          pdfBusy={pdfBusy}
           draftLoading={draftLoading}
           exportState={exportState}
           hasDraft={Boolean(draft)}

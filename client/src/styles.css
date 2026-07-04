@@ -1451,6 +1451,9 @@ small.helper {
 }
 
 /* Upload mode banner (review 2-8 / PO-08) */
+/* PDF download button (C3) */
+.pdf-button { width: 100%; margin-top: 8px; }
+
 /* Draft recovery banner (A2) */
 .recovery-banner {
   display: flex;

@@ -16,6 +16,7 @@ export function ControlPanel({
   notes, setNotes,
   activeModels = [], aiModel, setAiModel,
   onGenerate, onDownload,
+  onDownloadPdf, canDownloadPdf, pdfBusy,
   draftLoading, exportState, hasDraft,
   parseStatus
 }) {
@@ -139,6 +140,11 @@ export function ControlPanel({
             HWPX 다운로드
           </button>
         </div>
+        {canDownloadPdf && (
+          <button className="secondary-button pdf-button" type="button" onClick={onDownloadPdf} disabled={pdfBusy}>
+            {pdfBusy ? 'PDF 변환 중…' : '📄 PDF로 받기 (미리보기 기준)'}
+          </button>
+        )}
         {exportState.url && (
           <a className="download-link" href={exportState.url} download={exportState.fileName}>
             {exportState.fileName} 다운로드

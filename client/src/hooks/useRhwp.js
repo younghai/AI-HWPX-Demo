@@ -1,6 +1,10 @@
 import { useRef, useState } from 'react'
 import initRhwp, { HwpDocument } from '@rhwp/core'
 import { extractTextFromSvg } from '../lib/helpers.js'
+import { buildPdfFromSvgs } from '../lib/pdf.js'
+
+// Hard cap on PDF pages so a pathological doc can't hang the browser (review C3).
+const MAX_PDF_PAGES = 100
 
 const BUILT_INITIAL = { svgs: [], pageCount: 0, fileName: '', url: '' }
 
@@ -146,6 +150,20 @@ export function useRhwp() {
     setBuiltPreview(BUILT_INITIAL)
   }
 
+  // Render EVERY page of the built document (not just the 5 preview pages) and
+  // assemble a downloadable PDF (review C3). Reuses the already-parsed doc.
+  async function exportBuiltPdf(fileName) {
+    const document = builtDocRef.current
+    if (!document) return false
+    const total = Math.min(document.pageCount() || 1, MAX_PDF_PAGES)
+    const svgs = []
+    for (let i = 0; i < total; i += 1) {
+      svgs.push(document.renderPageSvg(i))
+      if (i % 5 === 4) await new Promise((resolve) => setTimeout(resolve, 0)) // yield
+    }
+    return buildPdfFromSvgs(svgs, fileName || builtPreview.fileName || 'document.hwpx')
+  }
+
   return {
     sourceInsight,
     parseStatus,
@@ -153,6 +171,7 @@ export function useRhwp() {
     parseFile,
     builtPreview,
     renderBuiltHwpx,
-    clearBuiltPreview
+    clearBuiltPreview,
+    exportBuiltPdf
   }
 }

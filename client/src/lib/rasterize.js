@@ -7,18 +7,41 @@
 const DIAGRAM_W = 605
 const DIAGRAM_H = 302
 
-// renderDiagramSvg emits `<svg xmlns=... viewBox=...>` with no intrinsic size.
-// An <img> needs explicit width/height to rasterize at full resolution, so
-// inject them onto the root tag.
+// An <img> needs explicit width/height on the root <svg> to rasterize at full
+// resolution. rhwp page SVGs already carry width/height, so we must STRIP the
+// existing ones before adding — a duplicate attribute makes the SVG unparseable
+// and the <img> silently fails to load (this broke PDF export, review C3).
+// Diagram SVGs (viewBox only) are unaffected: the strips are no-ops.
 function withExplicitSize(svg, w, h) {
-  return svg.replace(/<svg\b/, `<svg width="${w}" height="${h}"`)
+  return svg.replace(/<svg\b[^>]*>/i, (tag) =>
+    tag
+      .replace(/\swidth="[^"]*"/i, '')
+      .replace(/\sheight="[^"]*"/i, '')
+      .replace(/<svg\b/i, `<svg width="${w}" height="${h}"`)
+  )
 }
 
 /**
- * @param {string} svgString  output of renderDiagramSvg()
- * @returns {Promise<Blob>} PNG blob at 605x302
+ * Read an SVG's natural pixel size from its width/height attrs, falling back to
+ * the viewBox, then to A4 @96dpi. Used for PDF page sizing (review C3).
+ * @returns {{ width: number, height: number }}
  */
-export function svgToPngBlob(svgString, w = DIAGRAM_W, h = DIAGRAM_H) {
+export function svgNaturalSize(svgString) {
+  const wm = svgString.match(/\bwidth="([\d.]+)/)
+  const hm = svgString.match(/\bheight="([\d.]+)/)
+  let w = wm ? parseFloat(wm[1]) : 0
+  let h = hm ? parseFloat(hm[1]) : 0
+  if (!w || !h) {
+    const vb = svgString.match(/viewBox="[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)"/)
+    if (vb) { w = parseFloat(vb[1]); h = parseFloat(vb[2]) }
+  }
+  if (!w || !h) { w = 794; h = 1123 } // A4 @96dpi
+  return { width: w, height: h }
+}
+
+// Load an SVG string into a canvas at w×h on a white backing. Shared by the
+// PNG-blob (diagram) and JPEG-dataURL (PDF) paths.
+function svgToCanvas(svgString, w, h) {
   return new Promise((resolve, reject) => {
     const svg = withExplicitSize(svgString, w, h)
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
@@ -29,12 +52,11 @@ export function svgToPngBlob(svgString, w = DIAGRAM_W, h = DIAGRAM_H) {
         canvas.width = w
         canvas.height = h
         const ctx = canvas.getContext('2d')
-        // White backing so transparent SVG areas don't turn black in the HWPX.
-        ctx.fillStyle = '#ffffff'
+        ctx.fillStyle = '#ffffff' // white backing so transparent areas aren't black
         ctx.fillRect(0, 0, w, h)
         ctx.drawImage(img, 0, 0, w, h)
         URL.revokeObjectURL(url)
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), 'image/png')
+        resolve(canvas)
       } catch (err) {
         URL.revokeObjectURL(url)
         reject(err)
@@ -46,4 +68,26 @@ export function svgToPngBlob(svgString, w = DIAGRAM_W, h = DIAGRAM_H) {
     }
     img.src = url
   })
+}
+
+/**
+ * @param {string} svgString  output of renderDiagramSvg()
+ * @returns {Promise<Blob>} PNG blob at 605x302 (diagram embedding, review B1)
+ */
+export async function svgToPngBlob(svgString, w = DIAGRAM_W, h = DIAGRAM_H) {
+  const canvas = await svgToCanvas(svgString, w, h)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), 'image/png')
+  })
+}
+
+/**
+ * Rasterize an SVG to a JPEG data URL (review C3). JPEG keeps document pages an
+ * order of magnitude smaller than PNG in the assembled PDF, at negligible visual
+ * cost for mostly-white text pages.
+ * @returns {Promise<string>} data:image/jpeg;base64,…
+ */
+export async function svgToJpegDataUrl(svgString, w, h, quality = 0.9) {
+  const canvas = await svgToCanvas(svgString, w, h)
+  return canvas.toDataURL('image/jpeg', quality)
 }

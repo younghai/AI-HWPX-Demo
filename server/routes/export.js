@@ -38,7 +38,8 @@ router.post('/api/export-hwpx', requireSession, uploadExportFiles, async (req, r
       diagramImages: req.files?.diagramImages || [],
       rawSections: req.body?.sections || '',
       rawDiagrams: req.body?.diagrams || '[]',
-      docType: String(req.body?.docType || '').trim() || undefined
+      docType: String(req.body?.docType || '').trim() || undefined,
+      edited: req.body?.edited === 'true'
     })
     res.json({ ok: true, ...result })
   } catch (error) {

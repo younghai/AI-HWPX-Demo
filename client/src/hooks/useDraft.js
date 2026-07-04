@@ -208,6 +208,7 @@ export function useDraft({ setParseStatus }) {
       formData.append('sourceFile', sourceFile)
       formData.append('sourceMode', sourceInsight.mode)
       formData.append('sourceText', sourceInsight.extractedText)
+      formData.append('edited', String(Boolean(activeDraft.edited)))  // edit-rate KPI (C4)
       if (docType) formData.append('docType', docType)
 
       // B1: rasterize each diagram to a PNG so the server embeds the exact

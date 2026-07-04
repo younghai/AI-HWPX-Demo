@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { buildDraftWithAI, regenerateSectionWithAI } from '../services/draft.js'
 import { sendError } from '../lib/errors.js'
 import { requireSession } from '../lib/authGuard.js'
+import { record } from '../lib/metrics.js'
 
 const router = Router()
 
@@ -41,10 +42,15 @@ router.post('/api/generate-draft/stream', requireSession, async (req, res) => {
 })
 
 router.post('/api/regenerate-section', requireSession, async (req, res) => {
+  // Section-regenerate rate is a prompt-quality signal (review C4): a high rate
+  // vs. ai_draft count means users often reject the first section output.
+  const started = Date.now()
   try {
     const { body } = await regenerateSectionWithAI(req.body || {})
+    record('section_regenerate', { ok: true, ms: Date.now() - started })
     res.json({ ok: true, body })
   } catch (error) {
+    record('section_regenerate', { ok: false, ms: Date.now() - started })
     sendError(res, error)
   }
 })

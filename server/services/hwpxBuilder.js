@@ -92,7 +92,7 @@ async function attachDiagramPngs(combined, diagramImages, workDirPath) {
   return written
 }
 
-export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType }) {
+export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType, edited = false }) {
   if (!title) throw createHttpError('제목이 비어 있습니다.', 422)
 
   if (sourceFile) {
@@ -176,6 +176,11 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     if (result.stderr) logger.error({ stderr: result.stderr }, 'build_hwpx worker failed')
     throw createHttpError(message, status)
   }
+
+  // Edit rate (review C4): on a successful build, `ok` counts drafts the user
+  // edited before building, `fail` counts unedited — so ok/total = edit rate, a
+  // signal of how often the AI's first output needs manual fixing.
+  record('draft_edited', { ok: Boolean(edited) })
 
   // v4: 생성된 HWPX 에 대해 native + polaris 검증 실행.
   // docType 이 지정되면 v4/specs/<docType>.json 으로 polaris 규칙 적용.

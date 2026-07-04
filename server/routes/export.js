@@ -8,10 +8,15 @@ const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } })
 const router = Router()
 
-// Wrap multer so its errors (e.g. file too large) return JSON, not an HTML 500
-// that the client's response.json() cannot parse (review FE-02).
-function uploadSourceFile(req, res, next) {
-  upload.single('sourceFile')(req, res, (err) => {
+// Accept the source template (sourceFile) plus client pre-rendered diagram PNGs
+// (diagramImages, review B1). Wrap multer so its errors (e.g. file too large)
+// return JSON, not an HTML 500 the client's response.json() can't parse (FE-02).
+const uploadFields = upload.fields([
+  { name: 'sourceFile', maxCount: 1 },
+  { name: 'diagramImages', maxCount: 20 }
+])
+function uploadExportFiles(req, res, next) {
+  uploadFields(req, res, (err) => {
     if (!err) return next()
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
@@ -23,13 +28,14 @@ function uploadSourceFile(req, res, next) {
   })
 }
 
-router.post('/api/export-hwpx', requireSession, uploadSourceFile, async (req, res) => {
+router.post('/api/export-hwpx', requireSession, uploadExportFiles, async (req, res) => {
   try {
     const result = await buildHwpx({
       title: String(req.body?.title || '').trim(),
       rawToc: String(req.body?.toc || '').trim(),
       sourceMode: String(req.body?.sourceMode || '').trim(),
-      sourceFile: req.file || null,
+      sourceFile: req.files?.sourceFile?.[0] || null,
+      diagramImages: req.files?.diagramImages || [],
       rawSections: req.body?.sections || '',
       rawDiagrams: req.body?.diagrams || '[]',
       docType: String(req.body?.docType || '').trim() || undefined

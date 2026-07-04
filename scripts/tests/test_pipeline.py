@@ -206,6 +206,43 @@ def test_build_parity_fills_bodies_no_placeholder_leak(tmp_path: Path):
     assert "시장 내 경쟁력" not in section_xml
 
 
+# ── B1: client pre-rendered diagram PNG is used byte-for-byte ─────────────────
+def _make_png(path: Path) -> bytes:
+    import struct, zlib
+    w = h = 8
+    raw = b"".join(b"\x00" + b"\x10\x20\x30" * w for _ in range(h))
+    def chunk(t, d):
+        c = t + d
+        return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
+    path.write_bytes(png)
+    return png
+
+
+def test_diagram_png_bytes_prefers_client_png(tmp_path: Path):
+    """A client _pngPath is embedded byte-for-byte, no cairosvg needed (B1)."""
+    p = tmp_path / "client.png"
+    original = _make_png(p)
+    spec = {"type": "flowchart", "data": ["a"], "_pngPath": str(p)}
+    assert build_hwpx._diagram_png_bytes(spec) == original
+
+
+def test_diagram_png_bytes_rejects_bogus_pngpath(tmp_path: Path):
+    """A non-PNG _pngPath is not used; falls back to server render (None w/o cairo)."""
+    bad = tmp_path / "notpng.png"
+    bad.write_bytes(b"not a real png at all")
+    spec = {"type": "flowchart", "data": ["a"], "_pngPath": str(bad)}
+    out = build_hwpx._diagram_png_bytes(spec)
+    # Either cairosvg rendered a real PNG (if installed) or nothing (skip) — never
+    # the bogus bytes.
+    assert out is None or out[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 # ── PY-P2: --doc-date makes output deterministic ─────────────────────────────
 @pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
 def test_doc_date_is_deterministic(tmp_path: Path):

@@ -55,7 +55,44 @@ function parseWorkerError(stdout) {
   return { message: 'HWPX 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.', status: 500 }
 }
 
-export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSections, rawDiagrams, docType }) {
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47])
+const MAX_DIAGRAM_PNG_BYTES = 2 * 1024 * 1024
+
+// Persist client pre-rendered diagram PNGs to the work dir and attach each one's
+// path to the matching diagram entry in `combined` (review B1). The client names
+// each upload `diagram-{k}.png`, k indexing its diagram list; the k-th diagram
+// entry (in order) gets `_pngPath`, so the Python worker embeds those exact bytes
+// (preview == download) with no cairosvg needed. Returns the written paths for
+// cleanup. Rejects non-PNG or oversized uploads defensively.
+async function attachDiagramPngs(combined, diagramImages, workDirPath) {
+  const written = []
+  if (!Array.isArray(diagramImages) || !diagramImages.length) return written
+
+  const pngByIndex = new Map()
+  for (const img of diagramImages) {
+    const match = /^diagram-(\d+)\.png$/i.exec(img?.originalname || '')
+    if (!match || !img.buffer) continue
+    if (img.buffer.length > MAX_DIAGRAM_PNG_BYTES) continue
+    if (!img.buffer.subarray(0, 4).equals(PNG_SIGNATURE)) continue
+    const p = path.join(workDirPath, `${crypto.randomUUID()}-diagram.png`)
+    await fs.writeFile(p, img.buffer)
+    pngByIndex.set(Number(match[1]), p)
+    written.push(p)
+  }
+  if (pngByIndex.size) {
+    let dIdx = 0
+    for (const entry of combined) {
+      if (entry && entry._diagram === true) {
+        const p = pngByIndex.get(dIdx)
+        if (p) entry._pngPath = p
+        dIdx += 1
+      }
+    }
+  }
+  return written
+}
+
+export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType }) {
   if (!title) throw createHttpError('제목이 비어 있습니다.', 422)
 
   if (sourceFile) {
@@ -88,10 +125,12 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
   }
 
   let sectionsJsonPath = null
+  let diagramPngPaths = []
   const combined = parseSectionsPayload(rawSections, rawDiagrams, {
     onDiagramWarning: (err) => logger.warn({ err: err.message }, 'diagrams JSON parse failed — proceeding without diagrams')
   })
   if (combined) {
+    diagramPngPaths = await attachDiagramPngs(combined, diagramImages, workDir)
     sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
     await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
   }
@@ -124,6 +163,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
   } finally {
     if (templatePath) fs.unlink(templatePath).catch(() => {})
     if (sectionsJsonPath) fs.unlink(sectionsJsonPath).catch(() => {})
+    for (const p of diagramPngPaths) fs.unlink(p).catch(() => {})
   }
   record('hwpx_build', { ok: result.ok, ms: Date.now() - buildStarted })
 

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { buildOptimisticDraft, triggerDownload, estimateTemplateSlots } from '../lib/helpers.js'
+import { renderDiagramSvg } from '../lib/diagrams.js'
+import { svgToPngBlob } from '../lib/rasterize.js'
 
 // Autosave (A2): persist the working draft so an accidental refresh mid-edit
 // doesn't discard 10 minutes of work. Only the draft content is saved — the
@@ -135,6 +137,21 @@ export function useDraft({ setParseStatus }) {
       formData.append('sourceMode', sourceInsight.mode)
       formData.append('sourceText', sourceInsight.extractedText)
       if (docType) formData.append('docType', docType)
+
+      // B1: rasterize each diagram to a PNG so the server embeds the exact
+      // preview pixels (no cairosvg needed). A failure just omits that PNG —
+      // the server then falls back to its own render.
+      const diagrams = activeDraft.diagrams || []
+      await Promise.all(diagrams.map(async (spec, k) => {
+        try {
+          const svg = renderDiagramSvg(spec)
+          if (!svg) return
+          const blob = await svgToPngBlob(svg)
+          formData.append('diagramImages', blob, `diagram-${k}.png`)
+        } catch (err) {
+          console.warn(`diagram ${k} 래스터화 실패 — 서버 렌더링으로 대체`, err)
+        }
+      }))
 
       const response = await fetch('/api/export-hwpx', { method: 'POST', body: formData, signal: controller.signal })
       const payload = await response.json()

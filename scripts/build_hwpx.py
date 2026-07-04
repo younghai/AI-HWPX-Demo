@@ -376,28 +376,55 @@ def update_metadata(content_hpf: Path, title: str) -> None:
     tree.write(content_hpf, encoding="utf-8", xml_declaration=True)
 
 
-def embed_diagrams(
-    working_dir: Path,
-    diagrams: list[dict],
-) -> None:
-    """Generate PNG diagrams and embed them into the HWPX document.
+def _diagram_png_bytes(diag_spec: dict) -> bytes | None:
+    """Return PNG bytes for one diagram (review B1).
 
-    Gracefully skips if cairosvg cannot be imported — typically because the
-    native `libcairo` is missing. On macOS install with `brew install cairo`;
-    on Debian/Ubuntu `apt-get install libcairo2`; on Windows use GTK runtime.
+    Priority:
+      1. A client pre-rendered PNG (`_pngPath`) — the browser already rendered
+         this exact diagram in the preview, so using it byte-for-byte guarantees
+         "preview == download" AND needs no native cairo. This is the common path.
+      2. Server-side render via cairosvg (fallback for callers that don't upload
+         a PNG, or older clients). Requires libcairo; returns None if unavailable.
     """
+    png_path = diag_spec.get("_pngPath")
+    if png_path:
+        p = Path(png_path)
+        if p.is_file():
+            data = p.read_bytes()
+            if data[:8] == b"\x89PNG\r\n\x1a\n":  # valid PNG signature
+                return data
+            logging.warning("client diagram PNG at %s is not a valid PNG — falling back", png_path)
+
+    svg_str = render_diagram(diag_spec)
+    if not svg_str:
+        logging.warning("render_diagram returned None for spec: %s", diag_spec)
+        return None
     try:
         import cairosvg
     except (ImportError, OSError) as exc:
         logging.warning(
-            "cairosvg unavailable (%s) — skipping diagram embedding. "
-            "Install with: macOS 'brew install cairo', "
-            "Ubuntu 'apt-get install libcairo2', "
-            "or remove diagrams from the AI prompt.",
-            exc
+            "cairosvg unavailable (%s) and no client PNG — skipping diagram. "
+            "Install libcairo, or upgrade the client to send pre-rendered PNGs.",
+            exc,
         )
-        return
+        return None
+    try:
+        return cairosvg.svg2png(bytestring=svg_str.encode("utf-8"), output_width=605, output_height=302)
+    except Exception as exc:
+        logging.warning("cairosvg failed for diagram: %s", exc)
+        return None
 
+
+def embed_diagrams(
+    working_dir: Path,
+    diagrams: list[dict],
+) -> None:
+    """Embed each diagram as a PNG into the HWPX document.
+
+    PNG bytes come from the client's pre-rendered image when available, else from
+    a server-side cairosvg render (see _diagram_png_bytes). A diagram with no
+    obtainable PNG is skipped with a warning rather than failing the build.
+    """
     section_path = working_dir / "Contents" / "section0.xml"
     content_hpf  = working_dir / "Contents" / "content.hpf"
     bin_dir      = working_dir / "BinData"
@@ -432,25 +459,15 @@ def embed_diagrams(
 
     for diag_spec in diagrams:
         after_section = diag_spec.get("afterSection", "")
-        svg_str = render_diagram(diag_spec)
-        if not svg_str:
-            logging.warning("render_diagram returned None for spec: %s", diag_spec)
+
+        png_bytes = _diagram_png_bytes(diag_spec)
+        if not png_bytes:
             continue
 
-        # Convert SVG → PNG
         bin_id   = f"BIN{bin_counter:04d}"
         png_name = f"{bin_id}.png"
         png_path = bin_dir / png_name
-        try:
-            cairosvg.svg2png(
-                bytestring=svg_str.encode("utf-8"),
-                write_to=str(png_path),
-                output_width=605,
-                output_height=302,
-            )
-        except Exception as exc:
-            logging.warning("cairosvg failed for diagram %s: %s", bin_id, exc)
-            continue
+        png_path.write_bytes(png_bytes)
 
         bin_counter += 1
 

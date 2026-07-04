@@ -3,6 +3,7 @@ import { buildToc, deriveTitle, labelForDocType, getDocTypeMeta } from '../../sh
 import { AI_PROVIDERS, resolveModel } from '../lib/providers-config.js'
 import { createHttpError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from './ai.js'
+import { mockDraftJson, mockSectionBody } from './mockAi.js'
 import { getValidAccessToken } from '../lib/oauthTokens.js'
 import { record } from '../lib/metrics.js'
 
@@ -101,7 +102,7 @@ export async function buildDraftWithAI(input) {
   }
 
   const apiKey = (await resolveApiKey(provider, providerKey)) || clientKey
-  if (!apiKey) {
+  if (!provider.demo && !apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }
 
@@ -127,9 +128,19 @@ export async function buildDraftWithAI(input) {
   })
 
   const chosenModel = resolveModel(provider, input.model)
-  const callOnce = () => providerKey === 'anthropic'
-    ? callAnthropic(provider, apiKey, prompt, { model: chosenModel.id })
-    : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id, jsonMode: provider.jsonMode })
+  const callOnce = () => {
+    if (provider.demo) {
+      // No network — synthesize a placeholder draft that still flows through the
+      // same tryExtractJson + validateDraftPayload pipeline below.
+      return Promise.resolve({
+        text: JSON.stringify(mockDraftJson({ toc: fallbackToc, docLabel, companyName, goal })),
+        usage: null
+      })
+    }
+    return providerKey === 'anthropic'
+      ? callAnthropic(provider, apiKey, prompt, { model: chosenModel.id })
+      : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id, jsonMode: provider.jsonMode })
+  }
 
   let realUsage = null
 
@@ -230,9 +241,13 @@ export async function regenerateSectionWithAI(input) {
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
 
   const apiKey = await resolveApiKey(provider, providerKey)
-  if (!apiKey) throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 입력해 주세요.`, 401)
+  if (!provider.demo && !apiKey) throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 입력해 주세요.`, 401)
 
   const docLabel = labelForDocType(docType)
+  if (provider.demo) {
+    return { body: mockSectionBody({ heading, companyName, docLabel }) }
+  }
+
   const systemPrompt = '당신은 한국어 공식 문서 작성 전문가입니다. 요청한 섹션의 본문 텍스트만 출력하세요.'
   const prompt = `"${title}" ${docLabel}의 "${heading}" 섹션 본문만 새로 작성하세요.
 ${sourceText ? `\n원문 참고:\n---\n${sourceText.slice(0, 4000)}\n---\n` : ''}

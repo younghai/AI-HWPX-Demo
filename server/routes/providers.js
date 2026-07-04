@@ -12,9 +12,12 @@ router.get('/api/providers', (_req, res) => {
   const list = Object.entries(AI_PROVIDERS).map(([key, val]) => ({
     key,
     label: val.label,
+    demo: Boolean(val.demo),
     defaultModel: val.defaultModel,
     models: (val.models || []).map((m) => ({ id: m.id, label: m.label })),
-    configured: Boolean(process.env[val.envKey]) || hasOAuthToken(key),
+    // Demo needs no key, so it's always "configured"; real providers require an
+    // env key or a stored OAuth token.
+    configured: val.demo ? true : (Boolean(process.env[val.envKey]) || hasOAuthToken(key)),
     oauthSupported: Boolean(val.oauth && process.env[val.oauth?.clientIdEnv])
   }))
   res.json({ ok: true, providers: list })

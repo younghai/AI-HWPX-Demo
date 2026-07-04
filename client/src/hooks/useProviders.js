@@ -59,11 +59,13 @@ export function useProviders(onError) {
       const data = await res.json()
       if (data.ok) {
         setProviders(data.providers)
-        const configured = data.providers.find((p) => p.configured)
+        // Auto-select a REAL configured provider (skip the always-configured demo
+        // — it should only be used via an explicit demo action, never silently).
+        const configured = data.providers.find((p) => p.configured && !p.demo)
         if (configured) {
           setAiProviderState((current) => {
-            const currentIsConfigured = data.providers.find((p) => p.key === current)?.configured
-            if (currentIsConfigured) return current
+            const cur = data.providers.find((p) => p.key === current)
+            if (cur?.configured && !cur.demo) return current
             persistProvider(configured.key)
             return configured.key
           })
@@ -81,7 +83,10 @@ export function useProviders(onError) {
   }, [refresh])
 
   const activeProvider = providers.find((p) => p.key === aiProvider) || null
-  const hasConfigured = providers.some((p) => p.configured)
+  // "Has a real key" — the demo provider (always configured) does not count, so
+  // the generate gate still correctly reflects whether a paid provider is set up.
+  const hasConfigured = providers.some((p) => p.configured && !p.demo)
+  const hasDemo = providers.some((p) => p.demo)
 
   const activeModels = activeProvider?.models || []
   const storedModel = modelMap[aiProvider]
@@ -94,5 +99,5 @@ export function useProviders(onError) {
     setModelMap((prev) => ({ ...prev, [aiProvider]: modelId }))
   }, [aiProvider])
 
-  return { providers, aiProvider, setAiProvider, refresh, activeProvider, hasConfigured, aiModel, setAiModel, activeModels }
+  return { providers, aiProvider, setAiProvider, refresh, activeProvider, hasConfigured, hasDemo, aiModel, setAiModel, activeModels }
 }

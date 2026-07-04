@@ -43,12 +43,18 @@ export default function App() {
   const { toasts, dismiss, success, error: errorToast, info } = useToast()
 
   const {
-    providers, aiProvider, setAiProvider, refresh: refreshProviders, activeProvider, hasConfigured,
+    providers, aiProvider, setAiProvider, refresh: refreshProviders, activeProvider, hasConfigured, hasDemo,
     aiModel, setAiModel, activeModels
   } = useProviders((err) => {
     console.warn('providers fetch failed', err)
     errorToast('AI provider 목록을 불러오지 못했습니다.')
   })
+
+  // When the user has no real key, fall back to the demo provider (placeholder
+  // content, no network) so the full flow is still reachable. A1 데모 모드.
+  const usingDemo = !hasConfigured && hasDemo
+  const effectiveProvider = usingDemo ? 'mock' : aiProvider
+  const effectiveModel = usingDemo ? 'mock' : aiModel
 
   const {
     sourceInsight,
@@ -68,7 +74,7 @@ export default function App() {
 
   // Shared context for section-level regenerate + build (review PO-01).
   function draftContext() {
-    return { docType, companyName, goal, notes, docFields, sourceText: sourceInsight.extractedText, aiProvider, model: aiModel }
+    return { docType, companyName, goal, notes, docFields, sourceText: sourceInsight.extractedText, aiProvider: effectiveProvider, model: effectiveModel }
   }
 
   function usageMessage(usage) {
@@ -119,18 +125,22 @@ export default function App() {
   // Step 1 of the loop: generate the draft, then hand off to the editor for
   // review/edit. Building the HWPX is a separate, explicit step (handleBuild).
   async function handleGenerate() {
-    if (!hasConfigured) {
+    // Only hard-block when there's neither a real key nor the demo provider.
+    if (!hasConfigured && !hasDemo) {
       errorToast('먼저 우측 상단 ⚙ 버튼에서 AI 키를 설정해주세요.', {
         action: { label: '설정 열기', onClick: () => setShowSettings(true) }
       })
       return
+    }
+    if (usingDemo) {
+      info('데모 모드로 예시 초안을 생성합니다. 실제 AI 응답이 아니며, API 키를 연결하면 실제 생성이 가능합니다.')
     }
     clearBuiltPreview()
     setEditing(true)
     setStage('generating')
     const next = await generateDraft({
       sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle, docFields,
-      aiProvider, aiModel, onOptimistic: scrollToPreview
+      aiProvider: effectiveProvider, aiModel: effectiveModel, onOptimistic: scrollToPreview
     })
     if (!next) {
       setStage('error')

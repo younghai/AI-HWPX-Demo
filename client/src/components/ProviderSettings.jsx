@@ -122,7 +122,7 @@ export function ProviderSettings({ open, providers, aiProvider, setAiProvider, r
         <div className="modal-body">
           <p className="modal-desc">사용할 AI 프로바이더를 연결하세요. API 키 직접 입력 또는 OAuth 인증을 선택할 수 있습니다.</p>
           <div className="oauth-provider-list">
-            {providers.map((p) => {
+            {providers.filter((p) => !p.demo).map((p) => {
               const isActive = aiProvider === p.key
               return (
                 <div key={p.key} className={`oauth-card ${p.configured ? 'is-connected' : ''} ${isActive ? 'is-active' : ''}`}>

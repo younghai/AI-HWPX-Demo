@@ -84,6 +84,29 @@ describe('parseSectionsPayload', () => {
   })
 })
 
+// ── mock AI generator (A1 데모 모드) ─────────────────────────────────────────
+import { mockDraftJson, mockSectionBody } from '../services/mockAi.js'
+import { validateDraftPayload } from '../../shared/validate.js'
+
+describe('mockAi', () => {
+  it('produces a draft that passes the real validateDraftPayload contract', () => {
+    const draft = mockDraftJson({ toc: ['배경', '현황', '제안'], docLabel: '보고서', companyName: '테스트', goal: 'x' })
+    expect(() => validateDraftPayload(draft)).not.toThrow()
+    expect(draft.sections).toHaveLength(3)
+    expect(draft.diagrams).toEqual([])
+  })
+  it('falls back to a default TOC when none is given', () => {
+    const draft = mockDraftJson({ toc: [], docLabel: '문서', companyName: '회사' })
+    expect(draft.sections.length).toBeGreaterThan(0)
+    expect(() => validateDraftPayload(draft)).not.toThrow()
+  })
+  it('regenerated section body is non-empty plain text', () => {
+    const body = mockSectionBody({ heading: '핵심 제안', companyName: '테스트', docLabel: '보고서' })
+    expect(body.length).toBeGreaterThan(10)
+    expect(body).toContain('핵심 제안')
+  })
+})
+
 // ── env parse + atomic concurrent write (BE-03) ──────────────────────────────
 import { parseEnvFile } from '../lib/env.js'
 

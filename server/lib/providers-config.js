@@ -64,6 +64,18 @@ export const AI_PROVIDERS = {
       { id: 'grok-3', label: 'Grok 3 · 고품질', priceIn: 3, priceOut: 15 }
     ],
     oauth: null
+  },
+  // Demo provider (A1): no API key, no network. Synthesizes a placeholder draft
+  // so a first-time visitor can run the whole flow. `demo: true` keeps it out of
+  // the "has a real key" accounting on the client. See services/mockAi.js.
+  mock: {
+    label: '데모 (키 불필요)',
+    demo: true,
+    baseUrl: null,
+    defaultModel: 'mock',
+    envKey: null,
+    models: [{ id: 'mock', label: '데모 콘텐츠', priceIn: 0, priceOut: 0 }],
+    oauth: null
   }
 }
 
@@ -78,7 +90,7 @@ export function resolveModel(provider, requestedId) {
 
 export function knownEnvKeys() {
   return new Set([
-    ...Object.values(AI_PROVIDERS).map((p) => p.envKey),
+    ...Object.values(AI_PROVIDERS).map((p) => p.envKey).filter(Boolean),
     ...Object.values(AI_PROVIDERS).flatMap((p) => p.oauth ? [p.oauth.clientIdEnv, p.oauth.clientSecretEnv] : []),
     'OAUTH_REDIRECT_BASE'
   ])

@@ -276,3 +276,85 @@ ${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.j
   if (!body) throw createHttpError('AI가 빈 응답을 반환했습니다.', 502)
   return { body }
 }
+
+// ── C2 spike: parallel per-section generation ────────────────────────────────
+// EXPERIMENTAL / opt-in (input.parallel). Generates each section body
+// concurrently (reusing the tested regenerateSectionWithAI, with de-dup context)
+// instead of one monolithic call. Trade-off: total latency ≈ slowest section
+// (not the sum), and natural per-section progress — BUT strictly lower quality
+// than the monolithic path (no AI-written summary, no diagrams, and sections are
+// generated independently so global coherence/de-dup is weaker). Whether the
+// latency win justifies the quality cost can only be judged with real API keys;
+// keep this off by default until measured. See B2 for the SSE progress channel.
+export async function buildDraftParallel(input, { onProgress } = {}) {
+  const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
+  const docType = String(input.docType || 'report').trim()
+  const companyName = String(input.companyName || '회사명').trim()
+  const fileName = String(input.fileName || 'uploaded-document').trim()
+  const targetTitle = String(input.targetTitle || '').trim()
+  const providerKey = String(input.aiProvider || 'anthropic').trim()
+
+  const provider = AI_PROVIDERS[providerKey]
+  if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
+  const apiKey = (await resolveApiKey(provider, providerKey)) || String(input.aiApiKey || '').trim()
+  if (!provider.demo && !apiKey) {
+    throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
+  }
+
+  const toc = buildToc(docType)
+  const title = targetTitle || deriveTitle(fileName, docType)
+  const docLabel = labelForDocType(docType)
+  const chosenModel = resolveModel(provider, input.model)
+
+  emit({ phase: 'planning', total: toc.length })
+  const startedAt = Date.now()
+
+  // Bounded concurrency so N sections don't hammer the provider's rate limit.
+  const CONCURRENCY = 3
+  const sections = new Array(toc.length)
+  let cursor = 0
+  let done = 0
+  async function worker() {
+    while (cursor < toc.length) {
+      const i = cursor++
+      const heading = toc[i]
+      const { body } = await regenerateSectionWithAI({
+        aiProvider: providerKey,
+        aiApiKey: input.aiApiKey,
+        model: input.model,
+        heading,
+        title,
+        docType,
+        companyName,
+        goal: input.goal,
+        notes: input.notes,
+        sourceText: input.sourceText,
+        otherHeadings: toc.filter((_, j) => j !== i)
+      })
+      sections[i] = { heading, body }
+      done += 1
+      emit({ phase: 'section', done, total: toc.length, heading })
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, toc.length) }, worker))
+
+  const elapsedMs = Date.now() - startedAt
+  record('ai_draft_parallel', { ok: true, ms: elapsedMs })
+
+  return {
+    usage: {
+      elapsedMs,
+      attempts: toc.length,
+      provider: provider.label,
+      model: chosenModel.id,
+      parallel: true
+    },
+    title,
+    summary: `${companyName} 기준으로 ${docLabel} 초안을 ${toc.length}개 섹션 병렬 생성했습니다. (실험적 병렬 모드)`,
+    toc,
+    sections,
+    diagrams: [],
+    sourceExcerpt: [],
+    engine: `${provider.label} (parallel)`
+  }
+}

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { buildDraftWithAI, regenerateSectionWithAI } from '../services/draft.js'
+import { buildDraftWithAI, buildDraftParallel, regenerateSectionWithAI } from '../services/draft.js'
 import { sendError } from '../lib/errors.js'
 import { requireSession } from '../lib/authGuard.js'
 import { record } from '../lib/metrics.js'
@@ -30,7 +30,9 @@ router.post('/api/generate-draft/stream', requireSession, async (req, res) => {
     if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   }
   try {
-    const draft = await buildDraftWithAI(req.body || {}, {
+    // Opt-in experimental parallel section generation (review C2). Off by default.
+    const generate = req.body?.parallel === true ? buildDraftParallel : buildDraftWithAI
+    const draft = await generate(req.body || {}, {
       onProgress: (evt) => send('progress', { ...evt, elapsedMs: Date.now() - started })
     })
     send('result', { ok: true, draft })

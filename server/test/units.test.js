@@ -107,6 +107,23 @@ describe('mockAi', () => {
   })
 })
 
+// ── parallel section generation spike (C2) ───────────────────────────────────
+import { buildDraftParallel } from '../services/draft.js'
+
+describe('buildDraftParallel (C2 spike)', () => {
+  it('generates one section per TOC entry via the demo provider + emits progress', async () => {
+    const phases = []
+    const draft = await buildDraftParallel(
+      { aiProvider: 'mock', docType: 'report', companyName: '테스트', targetTitle: 'T' },
+      { onProgress: (e) => phases.push(e.phase) }
+    )
+    expect(draft.sections.length).toBe(5) // report TOC has 5 headings
+    expect(draft.sections.every((s) => s.heading && s.body)).toBe(true)
+    expect(draft.usage.parallel).toBe(true)
+    expect(phases.filter((p) => p === 'section').length).toBe(5)
+  })
+})
+
 // ── env parse + atomic concurrent write (BE-03) ──────────────────────────────
 import { parseEnvFile } from '../lib/env.js'
 

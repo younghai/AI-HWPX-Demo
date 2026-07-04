@@ -1,0 +1,34 @@
+services:
+  ai-hwp:
+    build: .
+    ports:
+      - "8792:8792"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8792
+      # 로컬/데모: 인증 없이 동작 (데모 프로바이더로 키 없이 체험 가능).
+      # 외부/팀 배포 시 아래 4개를 켜세요:
+      #   AUTH_MODE: protected
+      #   CLIENT_ORIGIN: https://your-domain
+      #   OAUTH_REDIRECT_BASE: https://your-domain
+      #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (아래 env_file 또는 여기)
+      AUTH_MODE: ${AUTH_MODE:-local}
+    # 실제 API 키/OAuth 시크릿은 이미지에 굽지 말고 여기서 주입 (선택).
+    # cp server/.env.example .env 후 채우면 자동 로드됩니다.
+    env_file:
+      - path: .env
+        required: false
+    # 생성 산출물을 컨테이너 밖에 보존 (선택).
+    volumes:
+      - generated:/app/generated
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8792/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  generated:

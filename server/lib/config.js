@@ -5,6 +5,9 @@ import 'dotenv/config'
 // DRIFTED (5192/8792 vs 5188/8788), which broke the OAuth redirect_uri when env
 // vars were unset. Centralizing here keeps them consistent.
 export const PORT = Number(process.env.PORT || 8792)
+// Bind host. Defaults to loopback for local safety; containers/servers set
+// HOST=0.0.0.0 so the port is reachable from outside (review A3 Docker).
+export const HOST = process.env.HOST || '127.0.0.1'
 export const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5192'
 export const OAUTH_REDIRECT_BASE = process.env.OAUTH_REDIRECT_BASE || `http://127.0.0.1:${PORT}`
 export const IS_PRODUCTION = process.env.NODE_ENV === 'production'

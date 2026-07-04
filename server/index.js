@@ -5,6 +5,9 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import crypto from 'crypto'
+import path from 'path'
+import { existsSync } from 'fs'
+import { fileURLToPath } from 'url'
 import pinoHttp from 'pino-http'
 
 import healthRouter from './routes/health.js'
@@ -18,7 +21,7 @@ import googleAuthRouter from './routes/googleAuth.js'
 import { generatedDirectory } from './services/hwpxBuilder.js'
 import { startGeneratedCleanup } from './lib/cleanup.js'
 import { requireSession } from './lib/authGuard.js'
-import { PORT, CLIENT_ORIGIN, OAUTH_REDIRECT_BASE } from './lib/config.js'
+import { PORT, HOST, CLIENT_ORIGIN, OAUTH_REDIRECT_BASE } from './lib/config.js'
 import { logger } from './lib/logger.js'
 import { snapshot } from './lib/metrics.js'
 
@@ -77,6 +80,23 @@ app.use(createAuthRouter({ oauthBase: OAUTH_BASE, clientOrigin: CLIENT_ORIGIN })
 
 startGeneratedCleanup(generatedDirectory)
 
-app.listen(PORT, '127.0.0.1', () => {
-  logger.info({ port: PORT, authMode: process.env.AUTH_MODE || 'local' }, `AI HWP server listening on http://127.0.0.1:${PORT}`)
+// Production: serve the built SPA from this same process so a single container
+// serves both the API and the client (review A3). No-op in dev, where vite
+// serves the client and proxies /api here. Placed after all API/auth routers so
+// the catch-all only handles unmatched, non-API GET routes.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const clientDist = path.resolve(__dirname, '..', 'client', 'dist')
+if (existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist))
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/generated') || req.path.startsWith('/auth')) {
+      return next()
+    }
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+  logger.info({ clientDist }, 'serving built SPA')
+}
+
+app.listen(PORT, HOST, () => {
+  logger.info({ host: HOST, port: PORT, authMode: process.env.AUTH_MODE || 'local' }, `AI HWP server listening on http://${HOST}:${PORT}`)
 })

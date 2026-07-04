@@ -30,7 +30,7 @@ AI API 키는 두 가지 방법으로 설정:
 1. `server/.env` 파일에 직접 입력 (`ANTHROPIC_API_KEY` 등 — 서버 재시작 필요)
 2. UI 우측 상단 **프로바이더 설정**에서 입력 → `server/.env`에 자동 저장
 
-> 💡 API 키 없이도 실행·업로드·미리보기·HWPX 내보내기는 동작합니다. AI 초안 생성만 키가 필요합니다.
+> 💡 **API 키 없이도 전체 흐름을 체험할 수 있습니다.** 키가 없으면 "데모" 프로바이더가 자동 선택되어 예시 초안을 생성합니다(실제 AI 아님). 실제 AI 생성만 키가 필요합니다. 편집 중인 초안은 자동 저장되어 새로고침해도 복구할 수 있습니다.
 
 ### 🔐 외부 배포 (protected 모드)
 
@@ -44,6 +44,21 @@ GOOGLE_CLIENT_SECRET=...
 ```
 
 protected 모드에서는 인증 게이트·rate limit·helmet·산출물 격리·zip/XXE 방어가 활성화됩니다. HTTPS 프록시 뒤에서 운영하세요.
+
+### 🐳 Docker (단일 컨테이너 배포)
+
+Node·Python·libcairo(다이어그램용)·한글 폰트가 모두 포함된 단일 이미지로, 하나의 프로세스가 API와 빌드된 SPA를 함께 서빙합니다. **호스트에 cairo/폰트가 없어도 다이어그램 임베딩이 그대로 동작**합니다.
+
+```bash
+docker compose up --build            # 빌드 후 http://127.0.0.1:8792
+# 또는 직접:
+docker build -t ai-hwp .
+docker run -p 8792:8792 ai-hwp
+```
+
+- 실제 AI 키/OAuth 시크릿은 이미지에 굽지 않습니다 — 런타임에 주입하세요. `cp server/.env.example .env` 후 채우면 `docker compose`가 자동 로드합니다(`.env`, 선택).
+- 외부 공개 시 `AUTH_MODE=protected` + `NODE_ENV=production` + `GOOGLE_CLIENT_ID/SECRET` + HTTPS 프록시를 함께 설정하세요.
+- 프로덕션 서버는 `HOST=0.0.0.0`으로 바인딩되며(컨테이너 기본), 로컬 직접 실행은 `127.0.0.1`이 기본입니다.
 
 ## 🎨 기능
 

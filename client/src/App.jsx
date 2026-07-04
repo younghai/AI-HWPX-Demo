@@ -67,7 +67,8 @@ export default function App() {
   } = useRhwp()
   const {
     draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll,
-    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection
+    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection,
+    recoverable, recoverDraft, dismissRecovery
   } = useDraft({ setParseStatus })
 
   const [editing, setEditing] = useState(false)
@@ -247,6 +248,19 @@ export default function App() {
         />
 
         <div className="preview-column">
+          {recoverable && !draft && (
+            <div className="recovery-banner" role="status">
+              <div className="recovery-banner-text">
+                <strong>이전에 작업하던 초안이 있습니다.</strong>
+                <span>{recoverable.draft?.title || '제목 없는 초안'} · 섹션 {recoverable.draft?.sections?.length ?? 0}개. 복구하면 편집 내용을 이어서 볼 수 있습니다.</span>
+              </div>
+              <div className="recovery-banner-actions">
+                <button type="button" className="primary-button" onClick={recoverDraft}>복구</button>
+                <button type="button" className="secondary-button" onClick={dismissRecovery}>무시</button>
+              </div>
+            </div>
+          )}
+
           {showEmptyState && <EmptyState onTrySample={handleTrySample} />}
 
           <ProgressStepper stage={stage} onCancel={handleCancel} />
@@ -261,7 +275,7 @@ export default function App() {
             showEditor={showEditor}
             editing={editing}
             building={exportState.loading}
-            canRegenerate={hasConfigured}
+            canRegenerate={hasConfigured || hasDemo}
             onTitleChange={updateTitle}
             onSectionChange={updateSection}
             onAddSection={addSection}

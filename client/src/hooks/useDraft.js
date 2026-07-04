@@ -1,12 +1,53 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buildOptimisticDraft, triggerDownload, estimateTemplateSlots } from '../lib/helpers.js'
+
+// Autosave (A2): persist the working draft so an accidental refresh mid-edit
+// doesn't discard 10 minutes of work. Only the draft content is saved — the
+// uploaded source file can't be persisted, so recovery restores the text and
+// prompts the user to re-upload the original before re-building.
+const AUTOSAVE_KEY = 'ai-hwp-draft-autosave'
+
+function loadSavedDraft() {
+  try {
+    const raw = window.localStorage?.getItem(AUTOSAVE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed?.draft && Array.isArray(parsed.draft.sections) && parsed.draft.sections.length) return parsed
+  } catch { /* disabled / corrupt */ }
+  return null
+}
 
 export function useDraft({ setParseStatus }) {
   const [draft, setDraft] = useState(null)
   const [draftLoading, setDraftLoading] = useState(false)
   const [exportState, setExportState] = useState({ loading: false, url: '', fileName: '', message: '' })
+  // Saved draft from a previous session, offered via a recovery banner (never
+  // auto-loaded). Read once on mount.
+  const [recoverable, setRecoverable] = useState(loadSavedDraft)
   const draftControllerRef = useRef(null)
   const exportControllerRef = useRef(null)
+
+  // Persist any real (non-optimistic) draft on change, stripping transient flags.
+  useEffect(() => {
+    if (!draft || draft.engine === 'optimistic-preview') return
+    try {
+      const clean = { ...draft, sections: (draft.sections || []).map(({ regenerating, ...s }) => s) }
+      window.localStorage?.setItem(AUTOSAVE_KEY, JSON.stringify({ draft: clean, savedAt: Date.now() }))
+    } catch { /* quota exceeded / disabled — autosave is best-effort */ }
+  }, [draft])
+
+  function recoverDraft() {
+    if (recoverable?.draft) {
+      setDraft(recoverable.draft)
+      setParseStatus('이전에 작업하던 초안을 복구했습니다. 원본 파일을 다시 업로드하면 이 초안으로 HWPX를 생성할 수 있습니다.')
+    }
+    setRecoverable(null)
+  }
+
+  function dismissRecovery() {
+    setRecoverable(null)
+    try { window.localStorage?.removeItem(AUTOSAVE_KEY) } catch { /* ignore */ }
+  }
 
   function resetExport() {
     setExportState({ loading: false, url: '', fileName: '', message: '' })
@@ -214,6 +255,7 @@ export function useDraft({ setParseStatus }) {
 
   return {
     draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll,
-    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection
+    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection,
+    recoverable, recoverDraft, dismissRecovery
   }
 }

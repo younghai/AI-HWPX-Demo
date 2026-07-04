@@ -9,7 +9,34 @@ const __dirname = path.dirname(__filename)
 const v4Root = path.resolve(__dirname, '..', '..')
 const samplesDir = path.join(v4Root, 'templates', 'samples')
 
+// Starter template gallery (review B3). Each is a valid HWPX pre-structured for
+// its document type (regenerate with scripts/gen_sample_templates.py). One click
+// loads it as the working template, then the AI (or demo) fills the bodies.
 const SAMPLES = [
+  {
+    id: 'report-basic',
+    label: '보고서 기본 양식',
+    description: '배경·현황·제안·계획·효과 5개 섹션. 분석 보고서 시작점.',
+    fileName: 'report-sample.hwpx',
+    docType: 'report',
+    suggestedTitle: '2026 상반기 분석 보고서'
+  },
+  {
+    id: 'proposal-basic',
+    label: '제안서 기본 양식',
+    description: '개요·문제·해결·일정·지원 5개 섹션. 사업 제안서 시작점.',
+    fileName: 'proposal-sample.hwpx',
+    docType: 'proposal',
+    suggestedTitle: '신규 서비스 도입 제안서'
+  },
+  {
+    id: 'minutes-basic',
+    label: '회의록 기본 양식',
+    description: '개요·논의·결정·액션·일정 5개 섹션. 회의록 시작점.',
+    fileName: 'minutes-sample.hwpx',
+    docType: 'minutes',
+    suggestedTitle: '주간 업무 회의록'
+  },
   {
     id: 'gonmun-basic',
     label: '공문서 기본 양식',

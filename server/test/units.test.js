@@ -43,6 +43,47 @@ describe('decodeOriginalName', () => {
   })
 })
 
+// ── sections payload parse (PY-08: no silent content loss) ───────────────────
+import { parseSectionsPayload } from '../lib/sections.js'
+
+describe('parseSectionsPayload', () => {
+  it('returns null when no sections provided (template-only, legit)', () => {
+    expect(parseSectionsPayload('', '[]')).toBeNull()
+    expect(parseSectionsPayload(undefined, undefined)).toBeNull()
+  })
+  it('parses a valid sections array + diagrams into a combined list', () => {
+    const out = parseSectionsPayload(
+      '[{"heading":"h","body":"b"}]',
+      '[{"type":"flowchart","data":[]}]'
+    )
+    expect(out).toHaveLength(2)
+    expect(out[0]).toEqual({ heading: 'h', body: 'b' })
+    expect(out[1]._diagram).toBe(true)
+  })
+  it('throws 422 on unparseable sections (was: silent 200 with empty body)', () => {
+    expect(() => parseSectionsPayload('{bad json', '[]')).toThrow(/파싱할 수 없습니다/)
+  })
+  it('throws 422 when sections is valid JSON but not an array', () => {
+    try {
+      parseSectionsPayload('{"not":"an array"}', '[]')
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect(e.statusCode).toBe(422)
+    }
+  })
+  it('throws 422 on an empty sections array', () => {
+    expect(() => parseSectionsPayload('[]', '[]')).toThrow(/비어 있거나/)
+  })
+  it('degrades a bad diagrams payload to no-diagrams (does not fail export)', () => {
+    const warnings = []
+    const out = parseSectionsPayload('[{"heading":"h","body":"b"}]', '{bad', {
+      onDiagramWarning: (e) => warnings.push(e)
+    })
+    expect(out).toHaveLength(1)
+    expect(warnings).toHaveLength(1)
+  })
+})
+
 // ── env parse + atomic concurrent write (BE-03) ──────────────────────────────
 import { parseEnvFile } from '../lib/env.js'
 

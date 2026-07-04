@@ -132,11 +132,6 @@ def detect_heading_style_ids(header_xml: Path) -> frozenset[str]:
         return frozenset({"1"})
 
 
-def _body_sentence(section: str, idx: int, title: str) -> str:
-    template = _BODY_SENTENCES[idx % len(_BODY_SENTENCES)]
-    return template.format(section=section, title=title)
-
-
 def _is_text_only_run(run: ET.Element) -> bool:
     """Run contains only text-related children (no pictures, tables, ctrl chars)."""
     for child in run:

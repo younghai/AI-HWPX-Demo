@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { createHttpError } from '../lib/errors.js'
 import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
+import { parseSectionsPayload } from '../lib/sections.js'
 import { validateHwpx } from './validator.js'
 import { logger } from '../lib/logger.js'
 import { record } from '../lib/metrics.js'
@@ -87,16 +88,12 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, rawSect
   }
 
   let sectionsJsonPath = null
-  if (rawSections) {
-    try {
-      const sections = JSON.parse(rawSections)
-      const diagrams = JSON.parse(rawDiagrams || '[]').map((d) => ({ ...d, _diagram: true }))
-      const combined = [...sections, ...diagrams]
-      sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
-      await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
-    } catch (err) {
-      logger.warn({ err: err.message }, 'sections JSON parse failed')
-    }
+  const combined = parseSectionsPayload(rawSections, rawDiagrams, {
+    onDiagramWarning: (err) => logger.warn({ err: err.message }, 'diagrams JSON parse failed — proceeding without diagrams')
+  })
+  if (combined) {
+    sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
+    await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
   }
 
   const args = [

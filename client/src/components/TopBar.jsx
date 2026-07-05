@@ -1,4 +1,4 @@
-export function TopBar({ hasConfigured, activeProviderLabel, onOpenSettings, user, onLogin, onLogout }) {
+export function TopBar({ hasConfigured, usingDemo, activeProviderLabel, onOpenSettings, user, onLogin, onLogout }) {
   const connected = Boolean(hasConfigured)
   const dotLabel = connected
     ? `AI 연결됨${activeProviderLabel ? ` · ${activeProviderLabel}` : ''}`
@@ -35,6 +35,15 @@ export function TopBar({ hasConfigured, activeProviderLabel, onOpenSettings, use
             <span className="status-dot is-connected" aria-hidden="true" />
             {activeProviderLabel || 'AI 연결됨'}
           </span>
+        ) : usingDemo ? (
+          <button
+            type="button"
+            className="ai-status ai-status--demo"
+            onClick={onOpenSettings}
+          >
+            <span className="status-dot" aria-hidden="true" />
+            데모 모드 · 키 없이 체험
+          </button>
         ) : (
           <button
             type="button"

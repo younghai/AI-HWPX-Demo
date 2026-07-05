@@ -17,7 +17,7 @@ export function ControlPanel({
   activeModels = [], aiModel, setAiModel,
   onGenerate, onDownload,
   onDownloadPdf, canDownloadPdf, pdfBusy,
-  draftLoading, exportState, hasDraft,
+  draftLoading, exportState, hasDraft, usingDemo,
   parseStatus
 }) {
   const hasFile = Boolean(sourceFile)
@@ -134,7 +134,7 @@ export function ControlPanel({
               ? '초안 생성 중...'
               : exportState.loading
                 ? 'HWPX 생성 중...'
-                : hasDraft ? '초안 재생성' : '초안 생성'}
+                : hasDraft ? '초안 재생성' : usingDemo ? '데모로 초안 생성' : '초안 생성'}
           </button>
           <button className="secondary-button" type="button" onClick={onDownload} disabled={!exportState.url || exportState.loading}>
             HWPX 다운로드

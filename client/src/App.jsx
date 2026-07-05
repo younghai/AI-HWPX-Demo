@@ -240,6 +240,7 @@ export default function App() {
         {autoLogin && <LoginOverlay onLogin={loginWithPopup} user={user} />}
       <TopBar
         hasConfigured={hasConfigured}
+        usingDemo={usingDemo}
         activeProviderLabel={activeProvider?.label}
         onOpenSettings={() => setShowSettings(true)}
         user={user}
@@ -276,6 +277,7 @@ export default function App() {
           draftLoading={draftLoading}
           exportState={exportState}
           hasDraft={Boolean(draft)}
+          usingDemo={usingDemo}
           parseStatus={parseStatus}
         />
 

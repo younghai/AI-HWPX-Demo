@@ -1243,6 +1243,21 @@ small.helper {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
 }
+.ai-status--demo {
+  cursor: pointer;
+  border-color: rgba(255, 203, 5, 0.42);
+  background: var(--accent-soft);
+  color: var(--download-ink);
+}
+.ai-status--demo:hover { background: rgba(255, 212, 56, 0.28); }
+.ai-status--demo:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+.ai-status--demo .status-dot {
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(255, 203, 5, 0.18);
+}
 @media (prefers-color-scheme: dark) {
   .ai-status--disconnected { color: #f87171; }
 }

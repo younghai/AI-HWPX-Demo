@@ -173,6 +173,18 @@ export default function App() {
         ? '미리보기와 다운로드 파일이 동일한 HWPX로 생성되었습니다.'
         : 'HWPX 파일이 생성되었습니다. 다운로드 버튼으로 받을 수 있습니다.')
       setStage('done')
+      // Diagram embed visibility (review D2): tell the user how many diagrams
+      // actually made it into the file — a partial/zero embed is no longer silent.
+      const dr = built.diagramReport
+      if (dr && dr.requestedCount > 0) {
+        if (dr.embeddedCount === dr.requestedCount) {
+          info(`다이어그램 ${dr.embeddedCount}/${dr.requestedCount}개가 문서에 반영되었습니다.`)
+        } else if (dr.embeddedCount === 0) {
+          errorToast(`다이어그램 ${dr.requestedCount}개가 문서에 반영되지 못했습니다. 미리보기를 다시 생성하거나 브라우저를 새로고침해 보세요.`)
+        } else {
+          errorToast(`다이어그램 ${dr.embeddedCount}/${dr.requestedCount}개만 반영되었습니다. 일부 다이어그램이 누락됐습니다.`)
+        }
+      }
       const v = built.validation
       if (v) {
         if (!v.ok) {

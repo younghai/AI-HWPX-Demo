@@ -95,6 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-document", default="document.hwpx", help="Name of the source document")
     parser.add_argument("--sections-json", help="JSON file with AI-generated sections [{heading, body}, ...]")
     parser.add_argument("--doc-date", help="Document date (YYYY.MM.DD). Defaults to today; pass a fixed value for deterministic output/tests.")
+    parser.add_argument("--report-json", help="Optional path to write a diagram-embedding report (requested/embedded/skipped) as JSON.")
     return parser.parse_args()
 
 
@@ -415,16 +416,43 @@ def _diagram_png_bytes(diag_spec: dict) -> bytes | None:
         return None
 
 
+def _cairosvg_available() -> bool:
+    try:
+        import cairosvg  # noqa: F401
+        return True
+    except (ImportError, OSError):
+        return False
+
+
+def _has_valid_client_png(diag_spec: dict) -> bool:
+    """True iff the diagram carries a usable client pre-rendered PNG (review D2)."""
+    png_path = diag_spec.get("_pngPath")
+    if not png_path:
+        return False
+    p = Path(png_path)
+    return p.is_file() and p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def embed_diagrams(
     working_dir: Path,
     diagrams: list[dict],
-) -> None:
-    """Embed each diagram as a PNG into the HWPX document.
+) -> dict:
+    """Embed each diagram as a PNG into the HWPX document and RETURN a report
+    (review D2 — diagram embed visibility).
 
     PNG bytes come from the client's pre-rendered image when available, else from
     a server-side cairosvg render (see _diagram_png_bytes). A diagram with no
-    obtainable PNG is skipped with a warning rather than failing the build.
+    obtainable PNG is skipped (recorded in report["skipped"]) rather than failing
+    the build. The Node caller surfaces "N/M개 반영" from this report so silent
+    drops become visible.
     """
+    report = {
+        "requestedCount": len(diagrams),
+        "embeddedCount": 0,
+        "cairosvgAvailable": _cairosvg_available(),
+        "embedded": [],
+        "skipped": [],
+    }
     section_path = working_dir / "Contents" / "section0.xml"
     content_hpf  = working_dir / "Contents" / "content.hpf"
     bin_dir      = working_dir / "BinData"
@@ -459,9 +487,19 @@ def embed_diagrams(
 
     for diag_spec in diagrams:
         after_section = diag_spec.get("afterSection", "")
+        meta = {
+            "type": diag_spec.get("type", ""),
+            "title": diag_spec.get("title", ""),
+            "afterSection": after_section,
+        }
 
+        source = "client" if _has_valid_client_png(diag_spec) else "cairosvg"
         png_bytes = _diagram_png_bytes(diag_spec)
         if not png_bytes:
+            report["skipped"].append({
+                **meta,
+                "reason": "PNG 확보 실패 (클라이언트 PNG 없음/무효 + cairosvg 미가용 또는 렌더 실패)",
+            })
             continue
 
         bin_id   = f"BIN{bin_counter:04d}"
@@ -470,6 +508,8 @@ def embed_diagrams(
         png_path.write_bytes(png_bytes)
 
         bin_counter += 1
+        report["embeddedCount"] += 1
+        report["embedded"].append({**meta, "binId": bin_id, "source": source})
 
         # Register in content.hpf manifest
         item_el = ET.SubElement(hpf_root, f"{{{manifest_ns}}}item")
@@ -536,6 +576,7 @@ def embed_diagrams(
 
     tree.write(section_path, encoding="utf-8", xml_declaration=True)
     hpf_tree.write(content_hpf, encoding="utf-8", xml_declaration=True)
+    return report
 
 
 class SectionsParseError(Exception):
@@ -596,12 +637,27 @@ def run() -> Path:
         unpack_hwpx(template_path, working_dir)
 
         apply_smart_replacements(working_dir, title, toc, source_document, sections_body, doc_date=args.doc_date)
+        diagram_report = {
+            "requestedCount": 0, "embeddedCount": 0,
+            "cairosvgAvailable": False, "embedded": [], "skipped": [],
+        }
         if diagrams:
-            embed_diagrams(working_dir, diagrams)
+            diagram_report = embed_diagrams(working_dir, diagrams)
         update_preview(working_dir / "Preview" / "PrvText.txt", title, toc, source_document)
         update_metadata(working_dir / "Contents" / "content.hpf", title)
 
         pack_hwpx(working_dir, output)
+
+    # Diagram embed report (review D2) — the Node caller reads this to show
+    # "N/M개 반영" and warn on silent drops. Written after packing so a partial
+    # embed still reports accurately.
+    if args.report_json:
+        try:
+            Path(args.report_json).expanduser().resolve().write_text(
+                json.dumps(diagram_report, ensure_ascii=False), encoding="utf-8"
+            )
+        except OSError as exc:
+            logging.warning("report-json 쓰기 실패 — 계속 진행: %s", exc)
 
     # v3 P2: 후처리 — 네임스페이스 프리픽스 표준화 + itemCnt 동기화
     # 한컴 뷰어(macOS 포함) 에서 빈 페이지 / 스타일 무시 이슈를 예방한다.

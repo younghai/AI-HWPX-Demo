@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-07-05 — 다이어그램 폰트/색상이 cairosvg 폴백에서만 깨짐 (파리티 테스트로 못 잡음)
+
+### What happened
+- diagram-quality 브랜치 병합 후 실제 API로 다이어그램 임베드를 검증하던 중, cairosvg 경로(클라이언트 PNG 미업로드 시 폴백)로 렌더된 PNG에서:
+  1. 한글이 전부 tofu(빈 네모)로 깨짐 — 숫자/영문만 정상
+  2. flowchart 강조 박스·comparison 강조 컬럼의 텍스트가 배경과 같은 색으로 보이지 않음
+- D3 파리티 테스트(client JS ↔ python SVG 마크업 diff)는 두 렌더러의 텍스트/폰트 선언 문자열이 동일함만 확인해 통과했지만, **같은 마크업을 두 엔진이 다르게 rasterize** 하는 경우는 못 잡는다는 것이 드러남
+
+### Why
+1. **폰트**: `FONT` 상수가 `'Pretendard', 'Apple SD Gothic Neo', ...` 순서였는데, cairosvg는 브라우저처럼 CSS font-family 목록을 캐스케이딩하지 않고 **첫 번째 이름만** fontconfig로 조회 → 실패하면 (Pretendard는 어디에도 실제 설치/로드된 적 없는 이름) fontconfig 기본 폰트로 조용히 대체되는데 그 기본 폰트에 한글 글리프가 없음. 목록의 2번째인 'Apple SD Gothic Neo'(fontconfig에 실존)는 아예 시도되지 않음
+2. **색상**: `fill="{ACCENT}22"` 같은 8자리 hex 알파(CSS Color 4)를 cairosvg가 지원하지 않아 완전 불투명으로 렌더 → 강조색 텍스트가 이제 막 불투명해진 동일 강조색 배경과 겹쳐 안 보임. 같은 파일에 이미 있던 `rgba(28,25,23,0.12)` 표기는 정상 작동(작성자가 이미 알고 있던 안전한 패턴이었는데 3곳에서만 축약형을 씀)
+
+### Fix
+- `scripts/diagram_templates.py` + `client/src/lib/diagrams.js` (동일하게):
+  - `FONT`를 fontconfig에서 실존 확인된 `'Apple SD Gothic Neo'`가 맨 앞에 오도록 재정렬 (브라우저는 순서 무관하게 캐스케이딩하므로 무해)
+  - `fill="{ACCENT}NN"` 3곳을 `fill="{ACCENT}" fill-opacity="0.NN"` (필요시 `stroke-opacity`)로 교체 — SVG 1.1 코어라 두 엔진에서 동일하게 렌더
+- 실제 `/api/export-hwpx` 호출로 flowchart+comparison 임베드 PNG를 추출해 육안 확인 (한글 정상, 강조 틴트 정상)
+
+### Prevention
+- D3 파리티 테스트는 "마크업 동일"만 보장하고 "두 엔진이 같은 픽셀을 그린다"는 보장하지 않는다는 한계를 인지 — 새 SVG 속성/색상 문법을 diagram_templates.py/diagrams.js에 추가할 때는 **cairosvg가 지원하는 SVG 1.1 코어 속성인지** 먼저 확인 (8자리 hex, CSS Color 4 함수 등은 피하고 `fill-opacity`/`rgba()` 사용)
+- **미검증 잔여 리스크**: 이 수정은 이 dev 머신(macOS + Homebrew cairo)에서만 실측 검증됨. Docker 프로덕션 이미지(A3, `fonts-noto-cjk` 설치)는 이 세션에서 실행할 수 없어 미검증 — 배포 전 컨테이너 안에서 동일한 curl 기반 다이어그램 임베드 테스트로 PNG를 추출해 육안 확인 권장. cairosvg가 첫 폰트만 시도한다는 특성상, `fonts-noto-cjk`가 등록하는 실제 fontconfig 패밀리명(`Noto Sans CJK KR` 등)이 `FONT` 상수 어딘가에 정확히 일치해야 함
+
+---
+
 ## 2026-07-04 — 정본 템플릿의 폰트 안내 문구가 모든 생성 문서에 부제로 노출
 
 ### What happened

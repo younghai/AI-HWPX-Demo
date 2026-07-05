@@ -10,7 +10,10 @@ const D = {
   // byte-identical to FONT/MONO in scripts/diagram_templates.py — the client
   // PNG is authoritative, and the cairosvg fallback must match it. The parity
   // test (client/src/test/diagram-parity.test.js) enforces this.
-  FONT: "'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif",
+  // Order matters for the cairosvg fallback (see diagram_templates.py FONT
+  // comment): it doesn't cascade a font-family list like a browser does, so
+  // 'Apple SD Gothic Neo' leads instead of the unloaded 'Pretendard' webfont.
+  FONT: "'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', 'Noto Sans KR', 'Pretendard', sans-serif",
   MONO: "'D2Coding', 'Courier New', monospace",
   W: 605, H: 302
 }
@@ -64,12 +67,15 @@ function diagramFlowchart(steps, title = '') {
   s.forEach((step, i) => {
     const x = pad + i * (nodeW + arrowW)
     const focal = i === 0
-    const fill = focal ? `${D.ACCENT}22` : D.PAPER
+    // fill-opacity (not an 8-digit hex alpha) so this renders identically via
+    // the cairosvg fallback, which treats `${D.ACCENT}22`-style colors as opaque.
+    const fill = focal ? D.ACCENT : D.PAPER
+    const fillOpacity = focal ? ' fill-opacity="0.13"' : ''
     const stroke = focal ? D.ACCENT : D.MUTED
     const sw = focal ? 1.4 : 0.8
     const tc = focal ? D.ACCENT : D.INK
 
-    body += `<rect x="${x}" y="${nodeY}" width="${nodeW}" height="${nodeH}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+    body += `<rect x="${x}" y="${nodeY}" width="${nodeW}" height="${nodeH}" rx="6" fill="${fill}"${fillOpacity} stroke="${stroke}" stroke-width="${sw}"/>`
     body += `<text x="${x + 10}" y="${nodeY + 14}" font-family="${D.MONO}" font-size="8" fill="${D.MUTED}">${i + 1}</text>`
 
     const words = String(step).split(' ')
@@ -154,7 +160,7 @@ function diagramComparison(rows, title = '') {
   body += (
     `<rect x="${pad}" y="${startY}" width="${colLabelW}" height="${headerH}" fill="${D.PAPER}" stroke="${D.RULE}" stroke-width="0.8"/>` +
     `<rect x="${ax}" y="${startY}" width="${colW}" height="${headerH}" fill="${D.PAPER}" stroke="${D.RULE}" stroke-width="0.8"/>` +
-    `<rect x="${bx}" y="${startY}" width="${colW}" height="${headerH}" fill="${D.ACCENT}18" stroke="${D.ACCENT}" stroke-width="1"/>` +
+    `<rect x="${bx}" y="${startY}" width="${colW}" height="${headerH}" fill="${D.ACCENT}" fill-opacity="0.09" stroke="${D.ACCENT}" stroke-width="1"/>` +
     `<text x="${ax + colW / 2}" y="${startY + 17}" text-anchor="middle" font-family="${D.FONT}" font-size="10" fill="${D.MUTED}">${xe(headerA)}</text>` +
     `<text x="${bx + colW / 2}" y="${startY + 17}" text-anchor="middle" font-family="${D.FONT}" font-size="10" font-weight="700" fill="${D.ACCENT}">${xe(headerB)}</text>`
   )
@@ -165,7 +171,7 @@ function diagramComparison(rows, title = '') {
     body += (
       `<rect x="${pad}" y="${y}" width="${colLabelW}" height="${rowH}" fill="${bg}" stroke="${D.RULE}" stroke-width="0.6"/>` +
       `<rect x="${ax}" y="${y}" width="${colW}" height="${rowH}" fill="${bg}" stroke="${D.RULE}" stroke-width="0.6"/>` +
-      `<rect x="${bx}" y="${y}" width="${colW}" height="${rowH}" fill="${D.ACCENT}08" stroke="${D.ACCENT}40" stroke-width="0.6"/>` +
+      `<rect x="${bx}" y="${y}" width="${colW}" height="${rowH}" fill="${D.ACCENT}" fill-opacity="0.03" stroke="${D.ACCENT}" stroke-opacity="0.25" stroke-width="0.6"/>` +
       `<text x="${pad + 8}" y="${y + rowH / 2 + 4}" font-family="${D.FONT}" font-size="10" font-weight="700" fill="${D.INK}">${xe(row.label || '')}</text>` +
       `<text x="${ax + colW / 2}" y="${y + rowH / 2 + 4}" text-anchor="middle" font-family="${D.FONT}" font-size="10" fill="${D.MUTED}">${xe(row.a || '')}</text>` +
       `<text x="${bx + colW / 2}" y="${y + rowH / 2 + 4}" text-anchor="middle" font-family="${D.FONT}" font-size="10" fill="${D.ACCENT}">${xe(row.b || '')}</text>`

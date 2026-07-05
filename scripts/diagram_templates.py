@@ -30,7 +30,16 @@ RULE   = "rgba(28,25,23,0.12)"
 # MUST stay byte-identical to D.FONT / D.MONO in client/src/lib/diagrams.js.
 # The client PNG is authoritative (review B1); this cairosvg fallback must render
 # the same diagram. Parity is enforced by client/src/test/diagram-parity.test.js.
-FONT   = "'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif"
+#
+# Order matters here in a way it wouldn't in a browser: cairosvg does not
+# cascade a CSS font-family list — it resolves only the FIRST name via
+# fontconfig and, if that fails, silently substitutes fontconfig's default
+# (which lacks Hangul glyphs), leaving every later name unused. 'Apple SD
+# Gothic Neo' leads because it is the one name verified present via
+# `fc-list` on the reference dev/build host; 'Pretendard' has no installed
+# @font-face anywhere in this app (browser or server) and was leading
+# before, which made cairosvg render Korean text as tofu (QA 2026-07-05).
+FONT   = "'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', 'Noto Sans KR', 'Pretendard', sans-serif"
 MONO   = "'D2Coding', 'Courier New', monospace"
 
 # HWP units: 1 mm = 283.46 HWPU
@@ -100,14 +109,19 @@ def flowchart(steps: list[str], title: str = "") -> str:
     for i, step in enumerate(steps):
         x = pad + i * (node_w + arrow_w)
         is_focal = (i == 0)
-        fill   = f"{ACCENT}22" if is_focal else PAPER
+        # 8-digit hex alpha (e.g. f"{ACCENT}22") is CSS Color 4, not core SVG —
+        # cairosvg renders it fully opaque instead of translucent, which made
+        # the focal box's ACCENT-on-ACCENT text invisible (QA 2026-07-05).
+        # fill-opacity is SVG 1.1 core and renders identically everywhere.
+        fill         = ACCENT if is_focal else PAPER
+        fill_opacity = ' fill-opacity="0.13"' if is_focal else ''
         stroke = ACCENT if is_focal else MUTED
         sw     = 1.4 if is_focal else 0.8
         tc     = ACCENT if is_focal else INK
 
         body += (
             f'<rect x="{x}" y="{node_y}" width="{node_w}" height="{node_h}" rx="6" '
-            f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+            f'fill="{fill}"{fill_opacity} stroke="{stroke}" stroke-width="{sw}"/>'
         )
 
         # Step number
@@ -290,7 +304,7 @@ def comparison(rows: list[dict], title: str = "") -> str:
         f'<rect x="{ax}" y="{start_y}" width="{col_w}" height="{header_h}" '
         f'fill="{PAPER}" stroke="{RULE}" stroke-width="0.8"/>'
         f'<rect x="{bx}" y="{start_y}" width="{col_w}" height="{header_h}" '
-        f'fill="{ACCENT}18" stroke="{ACCENT}" stroke-width="1"/>'
+        f'fill="{ACCENT}" fill-opacity="0.09" stroke="{ACCENT}" stroke-width="1"/>'
         f'<text x="{ax + col_w // 2}" y="{start_y + 17}" text-anchor="middle" '
         f'font-family="{FONT}" font-size="9" fill="{MUTED}">{_esc(header_a)}</text>'
         f'<text x="{bx + col_w // 2}" y="{start_y + 17}" text-anchor="middle" '
@@ -306,7 +320,7 @@ def comparison(rows: list[dict], title: str = "") -> str:
             f'<rect x="{ax}" y="{y}" width="{col_w}" height="{row_h}" '
             f'fill="{bg}" stroke="{RULE}" stroke-width="0.6"/>'
             f'<rect x="{bx}" y="{y}" width="{col_w}" height="{row_h}" '
-            f'fill="{ACCENT}08" stroke="{ACCENT}40" stroke-width="0.6"/>'
+            f'fill="{ACCENT}" fill-opacity="0.03" stroke="{ACCENT}" stroke-opacity="0.25" stroke-width="0.6"/>'
             f'<text x="{pad + 8}" y="{y + row_h // 2 + 4}" '
             f'font-family="{FONT}" font-size="9" font-weight="700" fill="{INK}">'
             f'{_esc(row.get("label", ""))}</text>'

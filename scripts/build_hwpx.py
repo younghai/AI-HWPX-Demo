@@ -94,6 +94,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--toc", help="Pipe-separated or newline-separated table of contents")
     parser.add_argument("--source-document", default="document.hwpx", help="Name of the source document")
     parser.add_argument("--sections-json", help="JSON file with AI-generated sections [{heading, body}, ...]")
+    parser.add_argument("--doc-fields", help="JSON file with resolved docFields [{key, label, value}, ...] for label/value table cells")
     parser.add_argument("--doc-date", help="Document date (YYYY.MM.DD). Defaults to today; pass a fixed value for deterministic output/tests.")
     parser.add_argument("--report-json", help="Optional path to write a diagram-embedding report (requested/embedded/skipped) as JSON.")
     return parser.parse_args()
@@ -225,6 +226,67 @@ def _clone_paragraph_for_text(template_p: ET.Element, text: str) -> ET.Element:
     return clone
 
 
+def _normalize_field_label(text: str) -> str:
+    s = unicodedata.normalize("NFC", text or "").strip()
+    for ch in (":", "：", "·", ".", " "):
+        s = s.replace(ch, "")
+    return s
+
+
+def _match_field(cell_label: str, fields: list[dict]) -> dict | None:
+    cl = _normalize_field_label(cell_label)
+    if len(cl) < 2:
+        return None
+    for field in fields:
+        fl = _normalize_field_label(field.get("label", ""))
+        if len(fl) < 2:
+            continue
+        if cl == fl or cl in fl or fl in cl:
+            return field
+    return None
+
+
+def _cell_first_text(cell: ET.Element) -> str:
+    for t in cell.iter(f"{{{HP}}}t"):
+        if t.text and t.text.strip():
+            return t.text.strip()
+    return ""
+
+
+def _cell_fill_paragraph(cell: ET.Element) -> ET.Element | None:
+    return cell.find(f".//{{{HP}}}p")
+
+
+def _apply_label_value_fields(
+    root: ET.Element, fields: list[dict] | None
+) -> set[ET.Element]:
+    consumed: set[ET.Element] = set()
+    if not fields:
+        return consumed
+
+    for tbl in root.iter(f"{{{HP}}}tbl"):
+        for tr in tbl.findall(f"{{{HP}}}tr"):
+            cells = tr.findall(f"{{{HP}}}tc")
+            if len(cells) < 2:
+                continue
+            for i in range(len(cells) - 1):
+                field = _match_field(_cell_first_text(cells[i]), fields)
+                if field is None:
+                    continue
+                value = field.get("value", "")
+                if not value:
+                    continue
+                value_p = _cell_fill_paragraph(cells[i + 1])
+                if value_p is None:
+                    continue
+                _normalize_paragraph(value_p, value)
+                for cell in (cells[i], cells[i + 1]):
+                    for p in cell.iter(f"{{{HP}}}p"):
+                        consumed.add(p)
+                break
+    return consumed
+
+
 def apply_smart_replacements(
     working_dir: Path,
     title: str,
@@ -232,6 +294,7 @@ def apply_smart_replacements(
     source_document: str,
     sections_body: dict[str, str] | None = None,
     doc_date: str | None = None,
+    doc_fields: list[dict] | None = None,
 ) -> None:
     """Two-pass replacement that maps AI-generated content to template
     sections by INDEX (not name lookup), then normalizes each paragraph
@@ -249,6 +312,8 @@ def apply_smart_replacements(
     # Build parent map for paragraph insertion later
     parent_of = {child: parent for parent in root.iter() for child in parent}
 
+    consumed_paras = _apply_label_value_fields(root, doc_fields)
+
     # Pass 1: classify each paragraph
     # Skip wrapper paragraphs (whose text lives inside nested tables) by
     # requiring a direct text-only run with non-empty text.
@@ -258,6 +323,8 @@ def apply_smart_replacements(
     current: dict | None = None
 
     for p in root.iter(f"{{{HP}}}p"):
+        if p in consumed_paras:
+            continue
         if not _paragraph_has_direct_text(p):
             continue
         style_id = p.get("styleIDRef", "0")
@@ -613,6 +680,27 @@ def load_sections_body(json_path: str | None) -> tuple[dict[str, str] | None, li
     return sections, diagrams
 
 
+def load_doc_fields(json_path: str | None) -> list[dict]:
+    if not json_path:
+        return []
+    try:
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logging.warning("load_doc_fields: could not read %s: %s", json_path, exc)
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        label = unicodedata.normalize("NFC", str(item.get("label", ""))).strip()
+        value = unicodedata.normalize("NFC", str(item.get("value", ""))).strip()
+        if label and value:
+            out.append({"key": str(item.get("key", "")), "label": label, "value": value})
+    return out
+
+
 class TemplateNotFoundError(Exception):
     """Raised when the requested template file does not exist."""
 
@@ -627,6 +715,7 @@ def run() -> Path:
     source_document = unicodedata.normalize('NFC', args.source_document)
     output = Path(args.output).expanduser().resolve()
     sections_body, diagrams = load_sections_body(args.sections_json)
+    doc_fields = load_doc_fields(args.doc_fields)
 
     if not template_path.exists():
         # Surface only the basename — never leak absolute server paths to users.
@@ -636,7 +725,7 @@ def run() -> Path:
         working_dir = Path(temp_dir)
         unpack_hwpx(template_path, working_dir)
 
-        apply_smart_replacements(working_dir, title, toc, source_document, sections_body, doc_date=args.doc_date)
+        apply_smart_replacements(working_dir, title, toc, source_document, sections_body, doc_date=args.doc_date, doc_fields=doc_fields)
         diagram_report = {
             "requestedCount": 0, "embeddedCount": 0,
             "cairosvgAvailable": False, "embedded": [], "skipped": [],

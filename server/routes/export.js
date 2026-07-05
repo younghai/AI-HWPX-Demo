@@ -28,6 +28,19 @@ function uploadExportFiles(req, res, next) {
   })
 }
 
+// docFields arrives as a JSON string in the multipart body. A malformed payload
+// degrades to undefined (the worker just skips label/value fill) rather than
+// failing the export — the section bodies are the critical content.
+function parseDocFields(raw) {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
 router.post('/api/export-hwpx', requireSession, uploadExportFiles, async (req, res) => {
   try {
     const result = await buildHwpx({
@@ -39,6 +52,7 @@ router.post('/api/export-hwpx', requireSession, uploadExportFiles, async (req, r
       rawSections: req.body?.sections || '',
       rawDiagrams: req.body?.diagrams || '[]',
       docType: String(req.body?.docType || '').trim() || undefined,
+      docFields: parseDocFields(req.body?.docFields),
       edited: req.body?.edited === 'true'
     })
     res.json({ ok: true, ...result })

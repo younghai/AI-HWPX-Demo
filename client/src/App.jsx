@@ -164,7 +164,7 @@ export default function App() {
     setEditing(false)
     setStage('building')
     setParseStatus('초안 내용을 바탕으로 HWPX 파일을 생성하는 중입니다...')
-    const built = await buildHwpx({ draftOverride: draft, sourceFile, sourceInsight, docType })
+    const built = await buildHwpx({ draftOverride: draft, sourceFile, sourceInsight, docType, docFields })
     if (built?.url) {
       setStage('rendering')
       setParseStatus('HWPX를 렌더링해 미리보기에 반영합니다...')

@@ -35,6 +35,19 @@ export function getDocTypeMeta(docType) {
   return DOC_TYPE_META[docType] || DOC_TYPE_META.base
 }
 
+// C1: resolve a docType's declared fields + the user's docFields values into the
+// [{key, label, value}] shape the HWPX worker matches against label/value table
+// cells (see build_hwpx.py::_apply_label_value_fields). Only declared keys with a
+// non-empty value are kept, so unrelated keys and blank inputs never reach the
+// worker. Labels come from DOC_TYPE_META — the single source of truth.
+export function resolveDocFieldValues(docType, docFields) {
+  const meta = getDocTypeMeta(docType)
+  const values = (docFields && typeof docFields === 'object') ? docFields : {}
+  return meta.fields
+    .map((f) => ({ key: f.key, label: f.label, value: String(values[f.key] ?? '').trim() }))
+    .filter((f) => f.value)
+}
+
 export const TOC_TEMPLATES = {
   report: ['배경 및 목적', '현황 분석', '핵심 제안', '실행 계획', '기대 효과'],
   proposal: ['제안 개요', '문제 정의', '해결 방안', '구현 일정', '운영 지원'],

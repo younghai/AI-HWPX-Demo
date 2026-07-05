@@ -84,6 +84,32 @@ describe('parseSectionsPayload', () => {
   })
 })
 
+// ── docFields resolution (C1: label/value table fill) ───────────────────────
+import { resolveDocFieldValues } from '../../shared/docTypes.js'
+
+describe('resolveDocFieldValues', () => {
+  it('resolves minutes docFields to [{key,label,value}] using docTypes labels', () => {
+    const out = resolveDocFieldValues('minutes', { meetingDate: '2026-07-03 14:00', attendees: '김대표, 이과장' })
+    expect(out).toEqual([
+      { key: 'meetingDate', label: '회의 일시', value: '2026-07-03 14:00' },
+      { key: 'attendees', label: '참석자', value: '김대표, 이과장' }
+    ])
+  })
+  it('drops fields with empty/whitespace values (nothing to fill)', () => {
+    const out = resolveDocFieldValues('minutes', { meetingDate: '  ', attendees: '박사원' })
+    expect(out).toEqual([{ key: 'attendees', label: '참석자', value: '박사원' }])
+  })
+  it('returns [] for a doc type with no fields (base) or missing docFields', () => {
+    expect(resolveDocFieldValues('base', { x: 'y' })).toEqual([])
+    expect(resolveDocFieldValues('report', null)).toEqual([])
+    expect(resolveDocFieldValues('unknown-type', { a: 'b' })).toEqual([])
+  })
+  it('ignores docField keys not declared for the type', () => {
+    const out = resolveDocFieldValues('gonmun', { sender: '총무과', bogus: 'x' })
+    expect(out).toEqual([{ key: 'sender', label: '발신 기관/부서', value: '총무과' }])
+  })
+})
+
 // ── mock AI generator (A1 데모 모드) ─────────────────────────────────────────
 import { mockDraftJson, mockSectionBody } from '../services/mockAi.js'
 import { validateDraftPayload } from '../../shared/validate.js'

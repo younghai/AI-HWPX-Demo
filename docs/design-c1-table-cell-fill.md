@@ -1,8 +1,11 @@
 # C1 설계 노트 — 표 셀(라벨/값) 치환
 
-> 상태: **설계만 완료, 미구현.** 현재 동작은 회귀 가드 테스트
-> (`scripts/tests/test_pipeline.py::test_table_structure_survives_build`)로 고정됨.
-> 이 노트는 안전한 구현을 위한 방향과, 왜 이번에 바로 구현하지 않았는지를 기록한다.
+> 상태: **구현 완료.** `build_hwpx.py::_apply_label_value_fields` + `--doc-fields`,
+> 서버 플러밍(`shared/docTypes.js::resolveDocFieldValues` → `hwpxBuilder` → export
+> 라우트 → client `useDraft`), 골든 테스트 `scripts/tests/test_table_cell_fill.py`,
+> 픽스처 `testdata/minutes-form.hwpx`(+ `scripts/gen_table_fixture.py`).
+> 회귀 가드 `test_pipeline.py::test_table_structure_survives_build` 는 계속 통과한다.
+> 아래 본문은 구현 이전의 설계 근거를 역사적 기록으로 남겨둔다.
 
 ## 현재 동작 (조사 결과)
 
@@ -52,9 +55,24 @@ gonmun 템플릿 실측:
 - 따라서 **회귀 가드 테스트로 현재 동작을 먼저 고정**(plan의 "골든 테스트 확장
   선행")하고, 실제 기능은 라벨/값 표 픽스처를 확보한 별도 집중 작업으로 남긴다.
 
-## 착수 시 체크리스트
+## 착수 시 체크리스트 (완료)
 
-- [ ] 라벨/값 표를 가진 최소 HWPX 픽스처 추가(`templates/samples/` 또는 `testdata/`)
-- [ ] 위 4단계 라벨/값 패스 구현 (분류 제외 포함)
-- [ ] 골든 테스트: 값 셀만 채워지고 라벨 셀·표 구조·기존 body/heading 매핑 불변
-- [ ] `test_table_structure_survives_build` 계속 통과(회귀 없음)
+- [x] 라벨/값 표를 가진 최소 HWPX 픽스처 추가 — `testdata/minutes-form.hwpx`
+      (`scripts/gen_table_fixture.py` 가 gonmun.hwpx 의 실제 셀을 복제해 결정적 생성)
+- [x] 위 4단계 라벨/값 패스 구현 (분류 제외 포함) — `_apply_label_value_fields`
+- [x] 골든 테스트: 값 셀만 채워지고 라벨 셀·표 구조·기존 body/heading 매핑 불변
+      — `test_table_cell_fill.py::test_golden_label_value_fill_end_to_end`
+- [x] `test_table_structure_survives_build` 계속 통과(회귀 없음)
+
+## 구현 메모 (design → code 매핑)
+
+- **매칭**(step 1): `_match_field` — NFC + 콜론/공백 제거 후 라벨 상호 부분문자열
+  매칭(동의어 "일시"↔"회의 일시"), 1글자 트리비얼 매칭 방지.
+- **값 채우기**(step 2): `_normalize_paragraph(value_p, value)` 재사용 → R5 준수
+  (stale run 제거 + linesegarray 리셋). 빈 값 셀(빈 run)도 `<hp:t>` 생성해 채움.
+- **분류 제외**(step 3): 매칭된 라벨·값 셀의 모든 `<hp:p>` 를 `consumed` set 으로
+  모아 Pass 1 순회에서 `continue` → 기존 title/heading/body 인덱스 불변.
+- **no-op**(step 4): `doc_fields` 빈/매칭 실패 시 `consumed` 는 빈 set → 완전 무변경.
+- **플러밍**: 라벨은 `docTypes.js` 가 단일 진실원. 서버가 `resolveDocFieldValues`
+  로 `{key,label,value}`(빈 값·미선언 키 제거) 를 만들어 `--doc-fields` JSON 으로
+  전달. 잘못된 payload 는 무시(본문 생성은 계속) — 부가 기능이므로 빌드 실패 금지.

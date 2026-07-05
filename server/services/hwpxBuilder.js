@@ -7,6 +7,7 @@ import { createHttpError } from '../lib/errors.js'
 import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { parseSectionsPayload } from '../lib/sections.js'
+import { resolveDocFieldValues } from '../../shared/docTypes.js'
 import { validateHwpx } from './validator.js'
 import { logger } from '../lib/logger.js'
 import { record } from '../lib/metrics.js'
@@ -92,7 +93,7 @@ async function attachDiagramPngs(combined, diagramImages, workDirPath) {
   return written
 }
 
-export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType, edited = false }) {
+export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType, docFields, edited = false }) {
   if (!title) throw createHttpError('제목이 비어 있습니다.', 422)
 
   if (sourceFile) {
@@ -135,6 +136,13 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
   }
 
+  let docFieldsJsonPath = null
+  const resolvedFields = resolveDocFieldValues(docType, docFields)
+  if (resolvedFields.length) {
+    docFieldsJsonPath = path.join(workDir, `${crypto.randomUUID()}-docfields.json`)
+    await fs.writeFile(docFieldsJsonPath, JSON.stringify(resolvedFields), 'utf-8')
+  }
+
   // Diagram embed report (review D2): the worker writes requested/embedded/skipped
   // here so we can surface "N/M개 반영" and warn on silent drops.
   const reportJsonPath = path.join(workDir, `${crypto.randomUUID()}-report.json`)
@@ -150,6 +158,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
   ]
   if (templatePath) args.push('--template-file', templatePath)
   if (sectionsJsonPath) args.push('--sections-json', sectionsJsonPath)
+  if (docFieldsJsonPath) args.push('--doc-fields', docFieldsJsonPath)
 
   // macOS: Homebrew의 libcairo 는 dyld 기본 검색 경로 밖에 있어
   // cairosvg(다이어그램 PNG 변환)가 못 찾는다 → fallback 경로 주입
@@ -174,6 +183,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
   } finally {
     if (templatePath) fs.unlink(templatePath).catch(() => {})
     if (sectionsJsonPath) fs.unlink(sectionsJsonPath).catch(() => {})
+    if (docFieldsJsonPath) fs.unlink(docFieldsJsonPath).catch(() => {})
     fs.unlink(reportJsonPath).catch(() => {})
     for (const p of diagramPngPaths) fs.unlink(p).catch(() => {})
   }

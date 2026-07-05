@@ -182,7 +182,7 @@ export function useDraft({ setParseStatus }) {
     }
   }
 
-  async function buildHwpx({ draftOverride, sourceFile, sourceInsight, docType }) {
+  async function buildHwpx({ draftOverride, sourceFile, sourceInsight, docType, docFields }) {
     const activeDraft = draftOverride || draft
     if (!activeDraft || !sourceFile) {
       setParseStatus('먼저 문서를 업로드하고 초안을 생성해 주세요.')
@@ -210,6 +210,9 @@ export function useDraft({ setParseStatus }) {
       formData.append('sourceText', sourceInsight.extractedText)
       formData.append('edited', String(Boolean(activeDraft.edited)))  // edit-rate KPI (C4)
       if (docType) formData.append('docType', docType)
+      // C1: send docFields so the server can fill label/value form-table cells
+      // (e.g. 회의록 일시/참석자). Only when non-empty — otherwise a plain no-op.
+      if (docFields && Object.keys(docFields).length) formData.append('docFields', JSON.stringify(docFields))
 
       // B1: rasterize each diagram to a PNG so the server embeds the exact
       // preview pixels (no cairosvg needed). A failure just omits that PNG —

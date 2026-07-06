@@ -1,0 +1,25 @@
+{
+  "name": "03-diagram-docfields",
+  "description": "다이어그램 임베드(B1/D2) + 표 셀 라벨/값 치환(C1)이 실제 바이트에 남는지 고정하는 케이스.",
+  "request": {
+    "title": "GOLDEN_03_TITLE",
+    "toc": ["개요 or 목적"],
+    "sections": [
+      {"heading": "개요 or 목적", "body": "GOLDEN_03_BODY 본문."}
+    ],
+    "diagrams": [
+      {"type": "flowchart", "data": ["1단계 접수", "2단계 검토"], "title": "GOLDEN_03_FLOW", "afterSection": "개요 or 목적"}
+    ],
+    "sourceMode": "hwpx-template",
+    "templateRelPath": "testdata/minutes-form.hwpx",
+    "docType": "minutes",
+    "docFields": {"meetingDate": "GOLDEN_03_DATE", "attendees": "GOLDEN_03_ATT"}
+  },
+  "expected": {
+    "markers_present": ["GOLDEN_03_TITLE", "GOLDEN_03_BODY", "GOLDEN_03_DATE", "GOLDEN_03_ATT"],
+    "markers_each_exact_count": 1,
+    "template_leaks_forbidden": ["폰트 HY헤드라인M, 크기 18", "수요조사 : 00억원"],
+    "validation_error_count_max": 0,
+    "bindata_min_count": 1
+  }
+}

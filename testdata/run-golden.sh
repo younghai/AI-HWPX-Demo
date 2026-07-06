@@ -46,12 +46,18 @@ run_case() {
     trap "rm -rf '$tmp'" RETURN
 
     # input.json 파싱
-    local title toc sections diagrams template
+    local title toc sections diagrams template doctype docfields
     title=$(python3 -c "import json; d=json.load(open('$input_json')); print(d['request']['title'])")
     toc=$(python3 -c "import json; d=json.load(open('$input_json')); print('\n'.join(d['request']['toc']))")
     sections=$(python3 -c "import json; d=json.load(open('$input_json')); print(json.dumps(d['request']['sections'], ensure_ascii=False))")
     diagrams=$(python3 -c "import json; d=json.load(open('$input_json')); print(json.dumps(d['request'].get('diagrams', []), ensure_ascii=False))")
     template=$(python3 -c "import json; d=json.load(open('$input_json')); print(d['request']['templateRelPath'])")
+    doctype=$(python3 -c "import json; d=json.load(open('$input_json')); print(d['request'].get('docType',''))")
+    docfields=$(python3 -c "import json; d=json.load(open('$input_json')); v=d['request'].get('docFields'); print(json.dumps(v, ensure_ascii=False) if v else '')")
+
+    local extra_args=()
+    [ -n "$doctype" ] && extra_args+=(-F "docType=$doctype")
+    [ -n "$docfields" ] && extra_args+=(-F "docFields=$docfields")
 
     # POST
     curl -sS -X POST "$SERVER_URL/api/export-hwpx" \
@@ -60,6 +66,7 @@ run_case() {
         -F "sections=$sections" \
         -F "diagrams=$diagrams" \
         -F "sourceMode=hwpx-template" \
+        "${extra_args[@]}" \
         -F "sourceFile=@$V3_ROOT/$template" > "$tmp/resp.json"
 
     local ok
@@ -85,7 +92,9 @@ resp = json.load(open(resp_json))
 # HWPX 본문 텍스트 추출
 HP = 'http://www.hancom.co.kr/hwpml/2011/paragraph'
 texts = []
+bindata_count = 0
 with zipfile.ZipFile(hwpx) as z:
+    bindata_count = sum(1 for name in z.namelist() if name.startswith('BinData/'))
     for name in z.namelist():
         if name.startswith('Contents/section') and name.endswith('.xml'):
             root = ET.fromstring(z.read(name))
@@ -115,6 +124,12 @@ max_err = exp.get('validation_error_count_max', 0)
 actual = v.get('errorCount', 0)
 if actual > max_err:
     errors.append(f"validation errors {actual} > max {max_err}")
+
+# 4. bindata_min_count — optional embedded asset floor
+if 'bindata_min_count' in exp:
+    min_bindata = exp['bindata_min_count']
+    if bindata_count < min_bindata:
+        errors.append(f"BinData entries {bindata_count} < min {min_bindata}")
 
 if errors:
     print("  ✗ 실패:")

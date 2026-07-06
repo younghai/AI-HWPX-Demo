@@ -11,7 +11,11 @@
     "build": "pnpm -C client build",
     "lint": "pnpm -C client lint",
     "test": "pnpm -C client test",
+    "test:all": "pnpm -C client test && pnpm -C server test && ./.venv/bin/python3 -m pytest scripts/tests -q",
     "postinstall": "bash scripts/setup-rhwp-symlink.sh"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

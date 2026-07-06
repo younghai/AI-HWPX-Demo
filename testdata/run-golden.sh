@@ -66,7 +66,7 @@ run_case() {
         -F "sections=$sections" \
         -F "diagrams=$diagrams" \
         -F "sourceMode=hwpx-template" \
-        "${extra_args[@]}" \
+        ${extra_args[@]+"${extra_args[@]}"} \
         -F "sourceFile=@$V3_ROOT/$template" > "$tmp/resp.json"
 
     local ok

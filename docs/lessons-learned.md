@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-07-06 — golden 러너가 macOS 기본 bash 3.2에서 즉사 (샌드박스 구현자는 못 잡는 부류)
+
+### What happened
+- golden 03 추가 커밋(0d96362) 직후 라이브 실행에서 `extra_args[@]: unbound variable`로 러너 전체 실패
+
+### Why
+- `set -u` + **빈 배열** `"${extra_args[@]}"` 확장은 bash 4.4 미만(macOS 기본 /bin/bash = 3.2)에서 unbound 에러 — 구현자(Codex)는 샌드박스에서 소켓 바인딩이 막혀 라이브로 못 돌리고 `bash -n`(문법만)으로 검증했기 때문에 통과처럼 보였음
+
+### Fix
+- `${extra_args[@]+"${extra_args[@]}"}` 관용구로 교체 (043eaa8)
+
+### Prevention
+- 러너/서버 스크립트 변경은 반드시 **감사자가 라이브 실행**으로 닫는다 — `bash -n`은 배열/`set -u` 상호작용을 못 잡는다
+- bash 스크립트에서 배열을 옵션 인자로 쓸 때는 처음부터 `${arr[@]+"${arr[@]}"}` 패턴 사용
+
+---
+
 ## 2026-07-05 — 다이어그램 폰트/색상이 cairosvg 폴백에서만 깨짐 (파리티 테스트로 못 잡음)
 
 ### What happened
@@ -28,7 +45,7 @@
 
 ### Prevention
 - D3 파리티 테스트는 "마크업 동일"만 보장하고 "두 엔진이 같은 픽셀을 그린다"는 보장하지 않는다는 한계를 인지 — 새 SVG 속성/색상 문법을 diagram_templates.py/diagrams.js에 추가할 때는 **cairosvg가 지원하는 SVG 1.1 코어 속성인지** 먼저 확인 (8자리 hex, CSS Color 4 함수 등은 피하고 `fill-opacity`/`rgba()` 사용)
-- **미검증 잔여 리스크**: 이 수정은 이 dev 머신(macOS + Homebrew cairo)에서만 실측 검증됨. Docker 프로덕션 이미지(A3, `fonts-noto-cjk` 설치)는 이 세션에서 실행할 수 없어 미검증 — 배포 전 컨테이너 안에서 동일한 curl 기반 다이어그램 임베드 테스트로 PNG를 추출해 육안 확인 권장. cairosvg가 첫 폰트만 시도한다는 특성상, `fonts-noto-cjk`가 등록하는 실제 fontconfig 패밀리명(`Noto Sans CJK KR` 등)이 `FONT` 상수 어딘가에 정확히 일치해야 함
+- ~~미검증 잔여 리스크~~ **→ 2026-07-06 실측 통과**: `docker build` 후 컨테이너 안에서 실제 `/api/export-hwpx` 다이어그램 임베드 → BinData PNG 추출 → 육안 확인 완료. Linux(fonts-noto-cjk)에서는 fontconfig가 미설치 1순위 폰트('Apple SD Gothic Neo')를 Noto CJK로 substitution해 한글이 정상 렌더됨 (macOS의 실패 모드와 다름). 현재 FONT 스택은 macOS·Linux 컨테이너 양쪽 실측 통과
 
 ---
 

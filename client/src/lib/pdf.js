@@ -14,7 +14,7 @@ const JPEG_QUALITY = 0.9    // JPEG keeps the PDF ~10x smaller than PNG for text
 /**
  * Build and download a PDF from an array of page SVG strings.
  * @param {string[]} svgs  one SVG string per page (full document, not just preview)
- * @param {string} fileName  suggested download name (…​.hwpx → …​.pdf)
+ * @param {string} fileName  suggested download name (… .hwpx → … .pdf)
  * @returns {Promise<boolean>} true on success
  */
 export async function buildPdfFromSvgs(svgs, fileName) {

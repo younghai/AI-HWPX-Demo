@@ -48,7 +48,7 @@ async function streamGenerateDraft(body, signal, onPhase) {
     })
   } catch (err) {
     if (err.name === 'AbortError') throw err
-    throw new Error('stream-unavailable')
+    throw new Error('stream-unavailable', { cause: err })
   }
   if (!res.ok || !res.body) throw new Error('stream-unavailable')
 
@@ -94,7 +94,7 @@ export function useDraft({ setParseStatus }) {
   useEffect(() => {
     if (!draft || draft.engine === 'optimistic-preview') return
     try {
-      const clean = { ...draft, sections: (draft.sections || []).map(({ regenerating, ...s }) => s) }
+      const clean = { ...draft, sections: (draft.sections || []).map(({ regenerating: _regenerating, ...s }) => s) }
       window.localStorage?.setItem(AUTOSAVE_KEY, JSON.stringify({ draft: clean, savedAt: Date.now() }))
     } catch { /* quota exceeded / disabled — autosave is best-effort */ }
   }, [draft])
@@ -162,7 +162,7 @@ export function useDraft({ setParseStatus }) {
           signal: controller.signal
         })
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || '초안 생성에 실패했습니다.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || '초안 생성에 실패했습니다.', { cause: streamErr })
         nextDraft = payload.draft
       }
 

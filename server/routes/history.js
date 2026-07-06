@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import path from 'path'
 import fs from 'fs/promises'
+import { requireSession } from '../lib/authGuard.js'
 import { sendError } from '../lib/errors.js'
 import { generatedDirectory } from '../services/hwpxBuilder.js'
 
@@ -10,7 +11,7 @@ const MAX_HISTORY = 20
 // Recent generated documents (review PO-07). Files are served by the existing
 // /generated static mount; this only lists metadata so a fresh page load can
 // re-access past results instead of losing them.
-router.get('/api/history', async (_req, res) => {
+router.get('/api/history', requireSession, async (_req, res) => {
   try {
     let names = []
     try {

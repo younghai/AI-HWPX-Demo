@@ -67,7 +67,7 @@ for (const p of ['/api/generate-draft', '/api/generate-draft/stream', '/api/rege
 }
 
 // Local observability snapshot (counts + avg latency for AI/build ops).
-app.get('/api/metrics', (_req, res) => res.json({ ok: true, metrics: snapshot() }))
+app.get('/api/metrics', requireSession, (_req, res) => res.json({ ok: true, metrics: snapshot() }))
 
 app.use(healthRouter)
 app.use(providersRouter)

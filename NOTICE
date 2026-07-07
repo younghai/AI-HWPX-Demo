@@ -1,0 +1,5 @@
+This product bundles hwpConverter (Apache-2.0), from
+https://github.com/vsdn/hwpConverter at commit 9af63ea.
+
+hwpConverter itself uses kr.dogfoot hwplib, hwpxlib, and hwp2hwpx
+(Apache-2.0), and Apache POI.

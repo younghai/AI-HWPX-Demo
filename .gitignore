@@ -9,6 +9,7 @@ client/dist/
 # Generated HWPX output + private work dir (per-run, do not track)
 generated/
 .work/
+vendor/
 
 # Runtime / session state (OMC, Claude Code local settings, logs)
 .omc/

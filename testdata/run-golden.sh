@@ -38,6 +38,15 @@ run_case() {
         return 0
     fi
 
+    local requires_converter
+    requires_converter=$(python3 -c "import json; d=json.load(open('$input_json')); print('1' if d['request'].get('requiresConverter') else '')")
+    if [ -n "$requires_converter" ]; then
+        if [ ! -f "$V3_ROOT/vendor/hwpconverter/hwpConverter.jar" ] || ! java -version >/dev/null 2>&1; then
+            echo "  ⊘ $name — converter 없음, 스킵"
+            return 0
+        fi
+    fi
+
     TOTAL=$((TOTAL + 1))
     echo ""
     echo "── case: $name ──"

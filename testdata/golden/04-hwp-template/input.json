@@ -1,0 +1,22 @@
+{
+  "name": "04-hwp-template",
+  "description": "HWP 템플릿을 hwpConverter로 HWPX 변환한 뒤 양식 기반 생성 경로가 본문 마커를 보존하는지 검증한다.",
+  "request": {
+    "title": "GOLDEN_04_TITLE",
+    "toc": ["개요"],
+    "sections": [
+      {"heading": "개요", "body": "GOLDEN_04_BODY 본문."}
+    ],
+    "diagrams": [],
+    "sourceMode": "hwpx-template",
+    "templateRelPath": "testdata/golden/04-hwp-template/sample.hwp",
+    "requiresConverter": true
+  },
+  "expected": {
+    "markers_present": ["GOLDEN_04_TITLE", "GOLDEN_04_BODY"],
+    "markers_each_exact_count": 1,
+    "template_leaks_forbidden": ["폰트 HY헤드라인M"],
+    "validation_error_count_max": 0,
+    "bindata_min_count": 1
+  }
+}

@@ -9,6 +9,7 @@ import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { parseSectionsPayload } from '../lib/sections.js'
 import { resolveDocFieldValues } from '../../shared/docTypes.js'
 import { validateHwpx } from './validator.js'
+import { convertHwpToHwpx, isHwpConverterAvailable } from './hwpConvert.js'
 import { logger } from '../lib/logger.js'
 import { record } from '../lib/metrics.js'
 
@@ -112,6 +113,8 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
   const outputPath = path.join(generatedDir, outputName)
 
   let templatePath = null
+  let uploadedHwpPath = null
+  let templateMode = 'generated'
   const sourceDocumentName = (sourceFile?.originalname || 'uploaded-document').normalize('NFC')
 
   if (sourceFile && sourceFile.originalname.toLowerCase().endsWith('.hwpx')) {
@@ -119,6 +122,15 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     const uploadPath = path.join(workDir, `${crypto.randomUUID()}.hwpx`)
     await fs.writeFile(uploadPath, sourceFile.buffer)
     templatePath = uploadPath
+    templateMode = 'hwpx'
+  } else if (sourceFile && sourceFile.originalname.toLowerCase().endsWith('.hwp') && isHwpConverterAvailable()) {
+    uploadedHwpPath = path.join(workDir, `${crypto.randomUUID()}.hwp`)
+    await fs.writeFile(uploadedHwpPath, sourceFile.buffer)
+    const convertedPath = await convertHwpToHwpx(uploadedHwpPath, workDir)
+    if (convertedPath) {
+      templatePath = convertedPath
+      templateMode = 'converted-hwp'
+    }
   }
 
   if (!sourceFile && sourceMode === 'hwpx-template') {
@@ -182,6 +194,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     }
   } finally {
     if (templatePath) fs.unlink(templatePath).catch(() => {})
+    if (uploadedHwpPath) fs.unlink(uploadedHwpPath).catch(() => {})
     if (sectionsJsonPath) fs.unlink(sectionsJsonPath).catch(() => {})
     if (docFieldsJsonPath) fs.unlink(docFieldsJsonPath).catch(() => {})
     fs.unlink(reportJsonPath).catch(() => {})
@@ -193,9 +206,7 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     // Clean up any partially-written output so it is never served (review PY-03).
     await fs.unlink(outputPath).catch(() => {})
     const { message, status } = parseWorkerError(result.stdout)
-    // Never surface raw stderr/traceback to the user (CLAUDE.md R4). The full
-    // stderr is preserved in server logs for debugging.
-    if (result.stderr) logger.error({ stderr: result.stderr }, 'build_hwpx worker failed')
+    if (result.stderr) logger.error({ stderr: result.stderr.slice(0, 1200) }, 'build_hwpx worker failed')
     throw createHttpError(message, status)
   }
 
@@ -207,13 +218,17 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
   // v4: 생성된 HWPX 에 대해 native + polaris 검증 실행.
   // docType 이 지정되면 v4/specs/<docType>.json 으로 polaris 규칙 적용.
   const validation = await validateHwpx(outputPath, { docType })
+  const message = templateMode === 'converted-hwp'
+    ? '업로드한 HWP 양식을 HWPX로 변환해 새 문서를 생성했습니다.'
+    : templateMode === 'hwpx'
+      ? '업로드한 HWPX 양식을 기준으로 새 문서를 생성했습니다.'
+      : '업로드한 문서 내용을 바탕으로 기본 HWPX 양식의 새 문서를 생성했습니다.'
 
   return {
     fileName: outputName,
     downloadUrl: `/generated/${outputName}`,
-    message: templatePath
-      ? '업로드한 HWPX 양식을 기준으로 새 문서를 생성했습니다.'
-      : '업로드한 문서 내용을 바탕으로 기본 HWPX 양식의 새 문서를 생성했습니다.',
+    message,
+    templateMode,
     validation,
     diagramReport
   }

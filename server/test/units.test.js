@@ -43,6 +43,32 @@ describe('decodeOriginalName', () => {
   })
 })
 
+describe('hwpConvert', () => {
+  afterEach(() => { vi.resetModules(); vi.unstubAllEnvs() })
+
+  it('reports converter availability as a boolean without throwing when unavailable', async () => {
+    vi.stubEnv('JAVA_BIN', '__missing_java_for_unit_test__')
+    vi.resetModules()
+    const { isHwpConverterAvailable } = await import('../services/hwpConvert.js')
+
+    expect(() => isHwpConverterAvailable()).not.toThrow()
+    expect(typeof isHwpConverterAvailable()).toBe('boolean')
+  })
+
+  it('returns null quickly when conversion is unavailable', async () => {
+    vi.stubEnv('JAVA_BIN', '__missing_java_for_unit_test__')
+    vi.resetModules()
+    const { convertHwpToHwpx } = await import('../services/hwpConvert.js')
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hwpconv-unavailable-'))
+
+    try {
+      await expect(convertHwpToHwpx(path.join(dir, 'input.hwp'), dir)).resolves.toBeNull()
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 // ── sections payload parse (PY-08: no silent content loss) ───────────────────
 import { parseSectionsPayload } from '../lib/sections.js'
 

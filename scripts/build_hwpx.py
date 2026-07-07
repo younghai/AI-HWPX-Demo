@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unicodedata
 import xml.etree.ElementTree as ET
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -347,6 +348,19 @@ def apply_smart_replacements(
     if current is not None:
         sections.append(current)
 
+    non_heading_style_counts: Counter[str] = Counter()
+    for p in root.iter(f"{{{HP}}}p"):
+        if p in consumed_paras:
+            continue
+        if not _paragraph_has_direct_text(p):
+            continue
+        style_id = p.get("styleIDRef", "0")
+        if style_id not in heading_ids:
+            non_heading_style_counts[style_id] += 1
+    body_style_id = "0"
+    if non_heading_style_counts:
+        body_style_id = sorted(non_heading_style_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
     # Pass 2: replace
     if title_para is not None:
         _normalize_paragraph(title_para, title)
@@ -371,6 +385,33 @@ def apply_smart_replacements(
 
         body_ps = sec['body_ps']
         body_count = len(body_ps)
+
+        if sentences and body_count == 0:
+            template_body: ET.Element | None = None
+            style_override: str | None = None
+            for other_index, other_sec in enumerate(sections):
+                if other_index == i:
+                    continue
+                other_body_ps = other_sec['body_ps']
+                if other_body_ps:
+                    template_body = other_body_ps[0]
+                    break
+            if template_body is None:
+                template_body = sec['heading_p']
+                style_override = body_style_id
+            parent = parent_of.get(sec['heading_p'])
+            if parent is not None:
+                insert_idx = list(parent).index(sec['heading_p']) + 1
+                for k, sentence in enumerate(sentences):
+                    clone = _clone_paragraph_for_text(template_body, sentence)
+                    if style_override is not None:
+                        clone.set("styleIDRef", style_override)
+                    parent.insert(insert_idx + k, clone)
+                    for child in clone.iter():
+                        for grand in child:
+                            parent_of[grand] = child
+                    parent_of[clone] = parent
+            continue
 
         # Distribute AI sentences 1:1 across body paragraphs.
         # - sentences > slots: clone the last body paragraph for the overflow (below)

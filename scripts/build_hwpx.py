@@ -369,6 +369,48 @@ def apply_smart_replacements(
 
     sections_body = sections_body or {}
 
+    if not sections and toc:
+        anchor_para = meta_para or title_para
+        parent = parent_of.get(anchor_para) if anchor_para is not None else None
+        body_template: ET.Element | None = None
+        for p in root.iter(f"{{{HP}}}p"):
+            if p in consumed_paras:
+                continue
+            if not _paragraph_has_direct_text(p):
+                continue
+            if p.get("styleIDRef", "0") == body_style_id:
+                body_template = p
+                break
+        if body_template is None:
+            for p in root.iter(f"{{{HP}}}p"):
+                if p in consumed_paras:
+                    continue
+                if _paragraph_has_direct_text(p):
+                    body_template = p
+                    break
+        if parent is not None and body_template is not None and anchor_para is not None:
+            heading_style_id = sorted(heading_ids)[0] if heading_ids else None
+            insert_idx = list(parent).index(anchor_para) + 1
+            insert_offset = 0
+            for section_name in toc:
+                heading_clone = _clone_paragraph_for_text(body_template, section_name)
+                if heading_style_id is not None:
+                    heading_clone.set("styleIDRef", heading_style_id)
+                parent.insert(insert_idx + insert_offset, heading_clone)
+                for child in heading_clone.iter():
+                    for grand in child:
+                        parent_of[grand] = child
+                parent_of[heading_clone] = parent
+                insert_offset += 1
+                for sentence in _split_body_sentences(sections_body.get(section_name, "")):
+                    body_clone = _clone_paragraph_for_text(body_template, sentence)
+                    parent.insert(insert_idx + insert_offset, body_clone)
+                    for child in body_clone.iter():
+                        for grand in child:
+                            parent_of[grand] = child
+                    parent_of[body_clone] = parent
+                    insert_offset += 1
+
     for i, sec in enumerate(sections):
         if i >= len(toc):
             break

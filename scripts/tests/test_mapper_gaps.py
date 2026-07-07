@@ -14,6 +14,7 @@ import build_hwpx
 HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 GONMUN_TEMPLATE = REPO_ROOT / "templates" / "gonmun.hwpx"
+NO_OUTLINE_FIXTURE = REPO_ROOT / "testdata" / "mapper-no-outline.hwpx"
 SLOTLESS_FIXTURE = REPO_ROOT / "testdata" / "mapper-slotless-heading.hwpx"
 
 
@@ -91,6 +92,23 @@ def test_body_slotless_heading_inserts_paragraphs(tmp_path: Path):
     assert output_xml.count("HC1_SLOTLESS_BETA") == 1
     assert _heading_texts(output_xml)[:2] == toc
     assert output_xml.count("<hp:tbl") == fixture_xml.count("<hp:tbl")
+
+
+@pytest.mark.skipif(not NO_OUTLINE_FIXTURE.exists(), reason="mapper no-outline fixture missing")
+def test_no_outline_usage_falls_back_to_insertion(tmp_path: Path):
+    toc = ["무개요 첫 섹션", "무개요 둘째 섹션"]
+    sections = [
+        {"heading": toc[0], "body": "HC1_NO_OUTLINE_ALPHA 고유 본문."},
+        {"heading": toc[1], "body": "HC1_NO_OUTLINE_BETA 고유 본문."},
+    ]
+
+    output = _build_hwpx(tmp_path, sections, toc, NO_OUTLINE_FIXTURE)
+    output_xml = _section_xml(output)
+
+    assert _heading_texts(output_xml)[:2] == toc
+    assert output_xml.count("HC1_NO_OUTLINE_ALPHA") == 1
+    assert output_xml.count("HC1_NO_OUTLINE_BETA") == 1
+    assert "최신 기술을 접목한 OOOO 시스템" in output_xml
 
 
 @pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")

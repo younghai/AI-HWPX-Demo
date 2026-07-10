@@ -365,6 +365,28 @@ describe('buildDraftParallel (C2 spike)', () => {
   })
 })
 
+// ── SEC-2: 생성 경로는 요청 body 의 API 키를 받지 않는다 ─────────────────────
+import { AI_PROVIDERS } from '../lib/providers-config.js'
+
+describe('draft generation — SEC-2 (no request-body API keys)', () => {
+  it('an injected aiApiKey is ignored: with no env/OAuth key both paths fail 401 before any provider call', async () => {
+    const envKey = AI_PROVIDERS.anthropic.envKey
+    const saved = process.env[envKey]
+    delete process.env[envKey]
+    clearOAuthToken('local', 'anthropic')
+    try {
+      await expect(
+        buildDraftWithAI({ aiProvider: 'anthropic', aiApiKey: 'sk-injected', sourceText: 'x' })
+      ).rejects.toMatchObject({ statusCode: 401 })
+      await expect(
+        buildDraftParallel({ aiProvider: 'anthropic', aiApiKey: 'sk-injected', sourceText: 'x' })
+      ).rejects.toMatchObject({ statusCode: 401 })
+    } finally {
+      if (saved !== undefined) process.env[envKey] = saved
+    }
+  })
+})
+
 // ── env parse + atomic concurrent write (BE-03) ──────────────────────────────
 import { parseEnvFile } from '../lib/env.js'
 

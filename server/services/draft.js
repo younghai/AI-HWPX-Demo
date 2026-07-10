@@ -36,7 +36,6 @@ export async function buildDraftWithAI(input, { onProgress, userKey = 'local' } 
   const fileName = String(input.fileName || 'uploaded-document').trim()
   const targetTitle = String(input.targetTitle || '').trim()
   const providerKey = String(input.aiProvider || 'anthropic').trim()
-  const clientKey = String(input.aiApiKey || '').trim()
 
   const effectiveText = sourceText
     || `제목: ${targetTitle || '문서 초안'}\n목표: ${goal || '일반 문서 작성'}\n메모: ${notes || '없음'}\n회사: ${companyName}`
@@ -46,7 +45,9 @@ export async function buildDraftWithAI(input, { onProgress, userKey = 'local' } 
     throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
   }
 
-  const apiKey = (await resolveApiKey(provider, providerKey, userKey)) || clientKey
+  // SEC-2: 요청 body 의 키는 받지 않는다 — 키는 env(설정 UI가 .env 에 저장) 또는
+  // 사용자별 OAuth 스토어에서만 온다. client 는 원래 생성 요청에 키를 싣지 않는다.
+  const apiKey = await resolveApiKey(provider, providerKey, userKey)
   if (!provider.demo && !apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }
@@ -222,7 +223,7 @@ export async function buildDraftParallel(input, { onProgress, userKey = 'local' 
 
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
-  const apiKey = (await resolveApiKey(provider, providerKey, userKey)) || String(input.aiApiKey || '').trim()
+  const apiKey = await resolveApiKey(provider, providerKey, userKey)
   if (!provider.demo && !apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }
@@ -246,7 +247,6 @@ export async function buildDraftParallel(input, { onProgress, userKey = 'local' 
       const heading = toc[i]
       const { body } = await regenerateSectionWithAI({
         aiProvider: providerKey,
-        aiApiKey: input.aiApiKey,
         model: input.model,
         heading,
         title,
@@ -256,7 +256,7 @@ export async function buildDraftParallel(input, { onProgress, userKey = 'local' 
         notes: input.notes,
         sourceText: input.sourceText,
         otherHeadings: toc.filter((_, j) => j !== i)
-      })
+      }, { userKey })
       sections[i] = { heading, body }
       done += 1
       emit({ phase: 'section', done, total: toc.length, heading })

@@ -94,18 +94,13 @@ async function attachDiagramPngs(combined, diagramImages, workDirPath) {
   return written
 }
 
-export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType, docFields, edited = false }) {
+export async function buildHwpx({ title, sourceMode, sourceFile, diagramImages = [], rawSections, rawDiagrams, docType, docFields, edited = false }) {
   if (!title) throw createHttpError('제목이 비어 있습니다.', 422)
 
   if (sourceFile) {
     sourceFile.originalname = decodeOriginalName(sourceFile.originalname)
     assertValidUpload(sourceFile)
   }
-
-  const toc = String(rawToc || '')
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean)
 
   // Unpredictable, collision-free output name (review BE-04/BE-12). The slug is
   // kept as a human hint; the UUID prevents enumeration and same-ms collisions.
@@ -164,7 +159,6 @@ export async function buildHwpx({ title, rawToc, sourceMode, sourceFile, diagram
     '--template', 'gonmun',
     '--output', outputPath,
     '--title', title,
-    '--toc', toc.join('\n'),
     '--source-document', sourceDocumentName,
     '--report-json', reportJsonPath
   ]

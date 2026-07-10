@@ -25,7 +25,7 @@ def _write_sections(path: Path, sections: list[dict[str, str]]) -> None:
 def _build_hwpx(
     tmp_path: Path,
     sections: list[dict[str, str]],
-    toc: list[str],
+    toc: list[str] | None,
     template_file: Path | None = None,
 ) -> Path:
     sections_path = tmp_path / "sections.json"
@@ -38,18 +38,42 @@ def _build_hwpx(
         str(output_path),
         "--title",
         "HC-1 매퍼 갭 테스트",
-        "--toc",
-        "\n".join(toc),
         "--sections-json",
         str(sections_path),
         "--doc-date",
         "2026.01.01",
     ]
+    if toc is not None:
+        command.extend(["--toc", "\n".join(toc)])
     if template_file is None:
         command.extend(["--template", "gonmun"])
     else:
         command.extend(["--template-file", str(template_file)])
     result = subprocess.run(command, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return output_path
+
+
+def _build_hwpx_without_sections(tmp_path: Path, toc: list[str]) -> Path:
+    output_path = tmp_path / "out.hwpx"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "build_hwpx.py"),
+            "--template",
+            "gonmun",
+            "--output",
+            str(output_path),
+            "--title",
+            "HC-1 매퍼 갭 테스트",
+            "--toc",
+            "\n".join(toc),
+            "--doc-date",
+            "2026.01.01",
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     return output_path
 
@@ -99,6 +123,48 @@ def _body_texts_after_heading(section_xml: str, heading: str) -> list[str]:
         if found_heading:
             body_texts.append(text)
     return body_texts
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_sections_json_toc_derivation_wins_over_conflicting_cli_toc(tmp_path: Path):
+    derived_toc = ["유래A", "유래B", "유래C"]
+    sections = [
+        {"heading": heading, "body": f"DERIVED_MARKER_{index} 고유 본문."}
+        for index, heading in enumerate(derived_toc, start=1)
+    ]
+
+    output = _build_hwpx(tmp_path, sections, ["무시X", "무시Y", "무시Z"])
+    output_xml = _section_xml(output)
+
+    assert _heading_texts(output_xml)[:3] == derived_toc
+    for ignored in ["무시X", "무시Y", "무시Z"]:
+        assert ignored not in output_xml
+    for index in range(1, 4):
+        assert output_xml.count(f"DERIVED_MARKER_{index}") == 1
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_sections_json_toc_derivation_works_without_cli_toc(tmp_path: Path):
+    derived_toc = ["유래A", "유래B", "유래C"]
+    sections = [
+        {"heading": heading, "body": f"NO_TOC_MARKER_{index} 고유 본문."}
+        for index, heading in enumerate(derived_toc, start=1)
+    ]
+
+    output = _build_hwpx(tmp_path, sections, None)
+    output_xml = _section_xml(output)
+
+    assert _heading_texts(output_xml)[:3] == derived_toc
+    for index in range(1, 4):
+        assert output_xml.count(f"NO_TOC_MARKER_{index}") == 1
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_no_sections_preserves_cli_toc_fallback(tmp_path: Path):
+    output = _build_hwpx_without_sections(tmp_path, ["개요"])
+    output_xml = _section_xml(output)
+
+    assert _heading_texts(output_xml)[0] == "개요"
 
 
 @pytest.mark.skipif(not SLOTLESS_FIXTURE.exists(), reason="mapper slotless fixture missing")

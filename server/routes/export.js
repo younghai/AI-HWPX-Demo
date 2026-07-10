@@ -45,7 +45,6 @@ router.post('/api/export-hwpx', requireSession, uploadExportFiles, async (req, r
   try {
     const result = await buildHwpx({
       title: String(req.body?.title || '').trim(),
-      rawToc: String(req.body?.toc || '').trim(),
       sourceMode: String(req.body?.sourceMode || '').trim(),
       sourceFile: req.files?.sourceFile?.[0] || null,
       diagramImages: req.files?.diagramImages || [],

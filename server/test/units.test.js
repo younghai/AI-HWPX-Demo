@@ -110,6 +110,50 @@ describe('parseSectionsPayload', () => {
   })
 })
 
+describe('buildHwpx', () => {
+  afterEach(() => {
+    vi.resetModules()
+    vi.doUnmock('../lib/utils.js')
+    vi.doUnmock('../services/hwpConvert.js')
+    vi.doUnmock('../services/validator.js')
+  })
+
+  it('does not pass --toc to the Python worker', async () => {
+    const runProcess = vi.fn(async () => ({ ok: true, stdout: 'Built test.hwpx', stderr: '' }))
+    vi.doMock('../lib/utils.js', () => ({
+      runProcess,
+      slugify: (value) => String(value).replace(/\s+/g, '-')
+    }))
+    vi.doMock('../services/hwpConvert.js', () => ({
+      convertHwpToHwpx: vi.fn(async () => null),
+      isHwpConverterAvailable: vi.fn(() => false)
+    }))
+    vi.doMock('../services/validator.js', () => ({
+      validateHwpx: vi.fn(async () => ({
+        ok: true,
+        errorCount: 0,
+        warningCount: 0,
+        violations: [],
+        engines: []
+      }))
+    }))
+    vi.resetModules()
+    const { buildHwpx } = await import('../services/hwpxBuilder.js')
+
+    await buildHwpx({
+      title: '테스트 문서',
+      sourceMode: '',
+      rawSections: '[{"heading":"유래A","body":"본문"}]',
+      rawDiagrams: '[]'
+    })
+
+    expect(runProcess).toHaveBeenCalledTimes(1)
+    const args = runProcess.mock.calls[0][1]
+    expect(args).toContain('--sections-json')
+    expect(args).not.toContain('--toc')
+  })
+})
+
 // ── docFields resolution (C1: label/value table fill) ───────────────────────
 import { buildToc, getDocTypeMeta, resolveDocFieldValues } from '../../shared/docTypes.js'
 

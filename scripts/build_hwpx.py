@@ -833,12 +833,14 @@ def run() -> Path:
     template = TEMPLATES[args.template]
     template_path = Path(args.template_file).expanduser().resolve() if args.template_file else template["path"]
     title = unicodedata.normalize('NFC', args.title or template["default_title"])
-    toc = normalize_toc(args.toc, args.template)
-    toc = [unicodedata.normalize('NFC', item) for item in toc]
-    source_document = unicodedata.normalize('NFC', args.source_document)
-    output = Path(args.output).expanduser().resolve()
     sections_body, diagrams = load_sections_body(args.sections_json)
     doc_fields = load_doc_fields(args.doc_fields)
+    if sections_body:
+        toc = list(sections_body.keys())
+    else:
+        toc = [unicodedata.normalize('NFC', item) for item in normalize_toc(args.toc, args.template)]
+    source_document = unicodedata.normalize('NFC', args.source_document)
+    output = Path(args.output).expanduser().resolve()
 
     if not template_path.exists():
         # Surface only the basename — never leak absolute server paths to users.

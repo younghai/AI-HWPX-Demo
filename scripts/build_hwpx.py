@@ -30,13 +30,6 @@ if str(SCRIPT_DIR) not in sys.path:
 from hwpx_utils import pack_hwpx, unpack_hwpx
 from diagram_templates import render_diagram, CANVAS_W_MM, CANVAS_H_MM, MM
 
-# v3 P2: 네임스페이스/itemCnt 후처리 (한컴 뷰어 호환성)
-try:
-    from fix_namespaces import fix_hwpx_namespaces
-except ImportError:
-    # scripts 디렉터리가 sys.path 에 있지만 모듈이 없을 수 있다 — 옵셔널 처리
-    fix_hwpx_namespaces = None
-
 
 HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 HH = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -527,6 +520,7 @@ def update_metadata(content_hpf: Path, title: str) -> None:
     tree.write(content_hpf, encoding="utf-8", xml_declaration=True)
 
 
+# Combined sections+diagrams magic-key contract is documented in server/lib/sections.js.
 def _diagram_png_bytes(diag_spec: dict) -> bytes | None:
     """Return PNG bytes for one diagram (review B1).
 
@@ -830,14 +824,6 @@ def run() -> Path:
             )
         except OSError as exc:
             logging.warning("report-json 쓰기 실패 — 계속 진행: %s", exc)
-
-    # v3 P2: 후처리 — 네임스페이스 프리픽스 표준화 + itemCnt 동기화
-    # 한컴 뷰어(macOS 포함) 에서 빈 페이지 / 스타일 무시 이슈를 예방한다.
-    if fix_hwpx_namespaces is not None:
-        try:
-            fix_hwpx_namespaces(str(output))
-        except Exception as exc:
-            logging.warning("fix_hwpx_namespaces 실패 — 계속 진행: %s", exc)
 
     return output
 

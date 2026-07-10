@@ -30,6 +30,7 @@ from hwpx.paragraphs import (
     _paragraph_has_direct_text,
     _split_body_sentences,
 )
+from hwpx.eltree import ParentIndex
 
 
 TEMPLATES = {
@@ -103,38 +104,22 @@ def detect_heading_style_ids(header_xml: Path) -> frozenset[str]:
 
 
 def _insert_sections_after(
-    parent: ET.Element,
+    index: ParentIndex,
     anchor_para: ET.Element,
     toc_names: list[str],
     sections_body: dict[str, str],
     body_template: ET.Element,
     heading_style_id: str | None,
-    parent_of: dict[ET.Element, ET.Element],
 ) -> ET.Element:
-    insert_idx = list(parent).index(anchor_para) + 1
-    insert_offset = 0
-    last_inserted = anchor_para
+    cur = anchor_para
     for section_name in toc_names:
         heading_clone = _clone_paragraph_for_text(body_template, section_name)
         if heading_style_id is not None:
             heading_clone.set("styleIDRef", heading_style_id)
-        parent.insert(insert_idx + insert_offset, heading_clone)
-        for child in heading_clone.iter():
-            for grand in child:
-                parent_of[grand] = child
-        parent_of[heading_clone] = parent
-        last_inserted = heading_clone
-        insert_offset += 1
+        cur = index.insert_after(cur, heading_clone)
         for sentence in _split_body_sentences(sections_body.get(section_name, "")):
-            body_clone = _clone_paragraph_for_text(body_template, sentence)
-            parent.insert(insert_idx + insert_offset, body_clone)
-            for child in body_clone.iter():
-                for grand in child:
-                    parent_of[grand] = child
-            parent_of[body_clone] = parent
-            last_inserted = body_clone
-            insert_offset += 1
-    return last_inserted
+            cur = index.insert_after(cur, _clone_paragraph_for_text(body_template, sentence))
+    return cur
 
 
 def _normalize_field_label(text: str) -> str:
@@ -220,8 +205,8 @@ def apply_smart_replacements(
     tree = _safe_parse(section_path)
     root = tree.getroot()
 
-    # Build parent map for paragraph insertion later
-    parent_of = {child: parent for parent in root.iter() for child in parent}
+    # Parent map + insertion bookkeeping (ET has no parent pointers).
+    index = ParentIndex(root)
 
     consumed_paras = _apply_label_value_fields(root, doc_fields)
 
@@ -281,7 +266,7 @@ def apply_smart_replacements(
 
     if not sections and toc:
         anchor_para = meta_para or title_para
-        parent = parent_of.get(anchor_para) if anchor_para is not None else None
+        parent = index.parent_of(anchor_para) if anchor_para is not None else None
         body_template: ET.Element | None = None
         for p in root.iter(f"{{{HP}}}p"):
             if p in consumed_paras:
@@ -301,7 +286,7 @@ def apply_smart_replacements(
         if parent is not None and body_template is not None and anchor_para is not None:
             heading_style_id = sorted(heading_ids)[0] if heading_ids else None
             _insert_sections_after(
-                parent, anchor_para, toc, sections_body, body_template, heading_style_id, parent_of
+                index, anchor_para, toc, sections_body, body_template, heading_style_id
             )
 
     last_section_anchor: ET.Element | None = None
@@ -336,19 +321,14 @@ def apply_smart_replacements(
             if template_body is None:
                 template_body = sec['heading_p']
                 style_override = body_style_id
-            parent = parent_of.get(sec['heading_p'])
-            if parent is not None:
-                insert_idx = list(parent).index(sec['heading_p']) + 1
-                for k, sentence in enumerate(sentences):
+            if index.parent_of(sec['heading_p']) is not None:
+                cur = sec['heading_p']
+                for sentence in sentences:
                     clone = _clone_paragraph_for_text(template_body, sentence)
                     if style_override is not None:
                         clone.set("styleIDRef", style_override)
-                    parent.insert(insert_idx + k, clone)
-                    for child in clone.iter():
-                        for grand in child:
-                            parent_of[grand] = child
-                    parent_of[clone] = parent
-                    section_anchor = clone
+                    cur = index.insert_after(cur, clone)
+                section_anchor = cur
             last_section_anchor = section_anchor
             continue
 
@@ -363,27 +343,19 @@ def apply_smart_replacements(
             for extra_p in body_ps[len(sentences):]:
                 _normalize_paragraph(extra_p, "")
 
-        if len(sentences) > body_count and body_ps:
+        if len(sentences) > body_count and body_ps and index.parent_of(body_ps[-1]) is not None:
             template_body = body_ps[-1]
-            parent = parent_of.get(template_body)
-            if parent is not None:
-                insert_idx = list(parent).index(template_body) + 1
-                for k, extra_sentence in enumerate(sentences[body_count:]):
-                    clone = _clone_paragraph_for_text(template_body, extra_sentence)
-                    parent.insert(insert_idx + k, clone)
-                    # Track in parent_of so future operations work
-                    for child in clone.iter():
-                        for grand in child:
-                            parent_of[grand] = child
-                    parent_of[clone] = parent
-                    section_anchor = clone
+            cur = template_body
+            for extra_sentence in sentences[body_count:]:
+                cur = index.insert_after(cur, _clone_paragraph_for_text(template_body, extra_sentence))
+            section_anchor = cur
         last_section_anchor = section_anchor
 
     if len(toc) > len(sections) and sections:
         remaining = toc[len(sections):]
         last_sec = sections[-1]
         anchor_para = last_section_anchor or (last_sec['body_ps'][-1] if last_sec['body_ps'] else last_sec['heading_p'])
-        parent = parent_of.get(anchor_para)
+        parent = index.parent_of(anchor_para)
         body_template: ET.Element | None = None
         if last_sec['body_ps']:
             body_template = last_sec['body_ps'][-1]
@@ -398,7 +370,7 @@ def apply_smart_replacements(
         if parent is not None and body_template is not None:
             heading_style_id = sorted(heading_ids)[0] if heading_ids else None
             _insert_sections_after(
-                parent, anchor_para, remaining, sections_body, body_template, heading_style_id, parent_of
+                index, anchor_para, remaining, sections_body, body_template, heading_style_id
             )
 
     # ── P0 FIX ─────────────────────────────────────────────────────────────

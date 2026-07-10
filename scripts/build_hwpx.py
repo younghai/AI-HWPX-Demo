@@ -220,6 +220,41 @@ def _clone_paragraph_for_text(template_p: ET.Element, text: str) -> ET.Element:
     return clone
 
 
+def _insert_sections_after(
+    parent: ET.Element,
+    anchor_para: ET.Element,
+    toc_names: list[str],
+    sections_body: dict[str, str],
+    body_template: ET.Element,
+    heading_style_id: str | None,
+    parent_of: dict[ET.Element, ET.Element],
+) -> ET.Element:
+    insert_idx = list(parent).index(anchor_para) + 1
+    insert_offset = 0
+    last_inserted = anchor_para
+    for section_name in toc_names:
+        heading_clone = _clone_paragraph_for_text(body_template, section_name)
+        if heading_style_id is not None:
+            heading_clone.set("styleIDRef", heading_style_id)
+        parent.insert(insert_idx + insert_offset, heading_clone)
+        for child in heading_clone.iter():
+            for grand in child:
+                parent_of[grand] = child
+        parent_of[heading_clone] = parent
+        last_inserted = heading_clone
+        insert_offset += 1
+        for sentence in _split_body_sentences(sections_body.get(section_name, "")):
+            body_clone = _clone_paragraph_for_text(body_template, sentence)
+            parent.insert(insert_idx + insert_offset, body_clone)
+            for child in body_clone.iter():
+                for grand in child:
+                    parent_of[grand] = child
+            parent_of[body_clone] = parent
+            last_inserted = body_clone
+            insert_offset += 1
+    return last_inserted
+
+
 def _normalize_field_label(text: str) -> str:
     s = unicodedata.normalize("NFC", text or "").strip()
     for ch in (":", "：", "·", ".", " "):
@@ -383,27 +418,11 @@ def apply_smart_replacements(
                     break
         if parent is not None and body_template is not None and anchor_para is not None:
             heading_style_id = sorted(heading_ids)[0] if heading_ids else None
-            insert_idx = list(parent).index(anchor_para) + 1
-            insert_offset = 0
-            for section_name in toc:
-                heading_clone = _clone_paragraph_for_text(body_template, section_name)
-                if heading_style_id is not None:
-                    heading_clone.set("styleIDRef", heading_style_id)
-                parent.insert(insert_idx + insert_offset, heading_clone)
-                for child in heading_clone.iter():
-                    for grand in child:
-                        parent_of[grand] = child
-                parent_of[heading_clone] = parent
-                insert_offset += 1
-                for sentence in _split_body_sentences(sections_body.get(section_name, "")):
-                    body_clone = _clone_paragraph_for_text(body_template, sentence)
-                    parent.insert(insert_idx + insert_offset, body_clone)
-                    for child in body_clone.iter():
-                        for grand in child:
-                            parent_of[grand] = child
-                    parent_of[body_clone] = parent
-                    insert_offset += 1
+            _insert_sections_after(
+                parent, anchor_para, toc, sections_body, body_template, heading_style_id, parent_of
+            )
 
+    last_section_anchor: ET.Element | None = None
     for i, sec in enumerate(sections):
         if i >= len(toc):
             break
@@ -420,6 +439,7 @@ def apply_smart_replacements(
 
         body_ps = sec['body_ps']
         body_count = len(body_ps)
+        section_anchor = body_ps[-1] if body_ps else sec['heading_p']
 
         if sentences and body_count == 0:
             template_body: ET.Element | None = None
@@ -446,6 +466,8 @@ def apply_smart_replacements(
                         for grand in child:
                             parent_of[grand] = child
                     parent_of[clone] = parent
+                    section_anchor = clone
+            last_section_anchor = section_anchor
             continue
 
         # Distribute AI sentences 1:1 across body paragraphs.
@@ -472,6 +494,30 @@ def apply_smart_replacements(
                         for grand in child:
                             parent_of[grand] = child
                     parent_of[clone] = parent
+                    section_anchor = clone
+        last_section_anchor = section_anchor
+
+    if len(toc) > len(sections) and sections:
+        remaining = toc[len(sections):]
+        last_sec = sections[-1]
+        anchor_para = last_section_anchor or (last_sec['body_ps'][-1] if last_sec['body_ps'] else last_sec['heading_p'])
+        parent = parent_of.get(anchor_para)
+        body_template: ET.Element | None = None
+        if last_sec['body_ps']:
+            body_template = last_sec['body_ps'][-1]
+        else:
+            for sec in sections:
+                if sec['body_ps']:
+                    body_template = sec['body_ps'][0]
+                    break
+            if body_template is None:
+                body_template = _clone_paragraph_for_text(last_sec['heading_p'], "")
+                body_template.set("styleIDRef", body_style_id)
+        if parent is not None and body_template is not None:
+            heading_style_id = sorted(heading_ids)[0] if heading_ids else None
+            _insert_sections_after(
+                parent, anchor_para, remaining, sections_body, body_template, heading_style_id, parent_of
+            )
 
     # ── P0 FIX ─────────────────────────────────────────────────────────────
     # AI 가 매핑하지 않은 섹션(toc 길이 초과 범위) 의 모든 body 단락도 비운다.

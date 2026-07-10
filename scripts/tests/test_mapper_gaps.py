@@ -76,6 +76,31 @@ def _heading_texts(section_xml: str) -> list[str]:
     return texts
 
 
+def _paragraph_texts(section_xml: str) -> list[tuple[str, str]]:
+    root = ET.fromstring(section_xml)
+    texts: list[tuple[str, str]] = []
+    for paragraph in root.iter(f"{{{HP}}}p"):
+        text = build_hwpx._direct_text_first(paragraph)
+        if text:
+            texts.append((paragraph.get("styleIDRef", "0"), text))
+    return texts
+
+
+def _body_texts_after_heading(section_xml: str, heading: str) -> list[str]:
+    found_heading = False
+    body_texts: list[str] = []
+    for style_id, text in _paragraph_texts(section_xml):
+        if style_id == "1":
+            if found_heading:
+                break
+            if text == heading:
+                found_heading = True
+            continue
+        if found_heading:
+            body_texts.append(text)
+    return body_texts
+
+
 @pytest.mark.skipif(not SLOTLESS_FIXTURE.exists(), reason="mapper slotless fixture missing")
 def test_body_slotless_heading_inserts_paragraphs(tmp_path: Path):
     toc = ["슬롯리스 첫 섹션", "슬롯리스 둘째 섹션"]
@@ -126,3 +151,57 @@ def test_normal_template_unchanged_by_mapper_fixes(tmp_path: Path):
     assert output_xml.count("HC1_REG_BETA") == 1
     assert _paragraph_count(output_xml) == 44
     assert output_xml.count("<hp:tbl") == 2
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_gonmun_eight_section_build_keeps_all_headings_and_bodies(tmp_path: Path):
+    toc = [f"오버플로 섹션 {index}" for index in range(1, 9)]
+    sections = [
+        {"heading": heading, "body": f"OVF_{index} 고유 본문."}
+        for index, heading in enumerate(toc, start=1)
+    ]
+
+    output = _build_hwpx(tmp_path, sections, toc)
+    output_xml = _section_xml(output)
+
+    assert _heading_texts(output_xml)[: len(toc)] == toc
+    for index in range(1, 9):
+        assert output_xml.count(f"OVF_{index}") == 1
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_overflow_section_body_splits_into_sentence_paragraphs(tmp_path: Path):
+    template_slot_count = len(_heading_texts(_section_xml(GONMUN_TEMPLATE)))
+    toc = [f"다문장 섹션 {index}" for index in range(1, template_slot_count + 2)]
+    overflow_heading = toc[-1]
+    sections = [
+        {"heading": heading, "body": f"BASE_SENTENCE_{index}."}
+        for index, heading in enumerate(toc, start=1)
+    ]
+    sections[-1]["body"] = "문장1. 문장2. 문장3."
+
+    output = _build_hwpx(tmp_path, sections, toc)
+    output_xml = _section_xml(output)
+
+    assert _body_texts_after_heading(output_xml, overflow_heading) == ["문장1.", "문장2.", "문장3."]
+
+
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_first_overflow_heading_follows_last_template_section_body(tmp_path: Path):
+    template_slot_count = len(_heading_texts(_section_xml(GONMUN_TEMPLATE)))
+    toc = [f"순서 섹션 {index}" for index in range(1, template_slot_count + 2)]
+    last_template_heading = toc[template_slot_count - 1]
+    first_overflow_heading = toc[template_slot_count]
+    last_template_body_marker = "LAST_TEMPLATE_SECTION_BODY"
+    sections = [
+        {"heading": heading, "body": f"ORDER_BODY_{index}."}
+        for index, heading in enumerate(toc, start=1)
+    ]
+    sections[template_slot_count - 1]["body"] = f"{last_template_body_marker}."
+
+    output = _build_hwpx(tmp_path, sections, toc)
+    output_xml = _section_xml(output)
+    paragraph_texts = [text for _, text in _paragraph_texts(output_xml)]
+
+    assert paragraph_texts.index(last_template_heading) < paragraph_texts.index(last_template_body_marker + ".")
+    assert paragraph_texts.index(last_template_body_marker + ".") < paragraph_texts.index(first_overflow_heading)

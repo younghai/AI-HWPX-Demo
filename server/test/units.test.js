@@ -392,22 +392,44 @@ describe('metrics', () => {
   })
 })
 
-// ── oauth token store (BE-05) ────────────────────────────────────────────────
+// ── oauth token store (BE-05, SEC-1 per-user scoping) ───────────────────────
 import { setOAuthToken, hasOAuthToken, getValidAccessToken, clearOAuthToken } from '../lib/oauthTokens.js'
+import { tokenOwnerKey } from '../lib/authGuard.js'
 
 describe('oauthTokens', () => {
-  afterEach(() => clearOAuthToken('openai'))
-  it('stores and returns a valid token', async () => {
-    setOAuthToken('openai', { accessToken: 'tok', refreshToken: 'r', expiresInSec: 3600 })
-    expect(hasOAuthToken('openai')).toBe(true)
+  afterEach(() => {
+    clearOAuthToken('local', 'openai')
+    clearOAuthToken('a@x.com', 'openai')
+    clearOAuthToken('b@x.com', 'openai')
+  })
+  it('stores and returns a valid token (owner-scoped)', async () => {
+    setOAuthToken('local', 'openai', { accessToken: 'tok', refreshToken: 'r', expiresInSec: 3600 })
+    expect(hasOAuthToken('local', 'openai')).toBe(true)
     const provider = { oauth: { tokenUrl: 'https://x', clientIdEnv: 'X', clientSecretEnv: 'Y' } }
-    expect(await getValidAccessToken(provider, 'openai')).toBe('tok')
+    expect(await getValidAccessToken(provider, 'local', 'openai')).toBe('tok')
   })
   it('drops an expired token with no refresh capability', async () => {
-    setOAuthToken('openai', { accessToken: 'tok', refreshToken: null, expiresInSec: -10 })
+    setOAuthToken('local', 'openai', { accessToken: 'tok', refreshToken: null, expiresInSec: -10 })
     const provider = { oauth: null }
-    expect(await getValidAccessToken(provider, 'openai')).toBeNull()
-    expect(hasOAuthToken('openai')).toBe(false)
+    expect(await getValidAccessToken(provider, 'local', 'openai')).toBeNull()
+    expect(hasOAuthToken('local', 'openai')).toBe(false)
+  })
+  it("SEC-1: one user's token is invisible and unusable to another user", async () => {
+    setOAuthToken('a@x.com', 'openai', { accessToken: 'tokA', refreshToken: 'r', expiresInSec: 3600 })
+    const provider = { oauth: { tokenUrl: 'https://x', clientIdEnv: 'X', clientSecretEnv: 'Y' } }
+    expect(hasOAuthToken('a@x.com', 'openai')).toBe(true)
+    expect(hasOAuthToken('b@x.com', 'openai')).toBe(false)
+    expect(await getValidAccessToken(provider, 'b@x.com', 'openai')).toBeNull()
+    expect(await getValidAccessToken(provider, 'a@x.com', 'openai')).toBe('tokA')
+  })
+})
+
+describe('tokenOwnerKey', () => {
+  it('scopes by email, then id, then the local bucket', () => {
+    expect(tokenOwnerKey({ email: 'a@x.com', id: 'ignored' })).toBe('a@x.com')
+    expect(tokenOwnerKey({ id: 'uid-1' })).toBe('uid-1')
+    expect(tokenOwnerKey(null)).toBe('local')
+    expect(tokenOwnerKey(undefined)).toBe('local')
   })
 })
 

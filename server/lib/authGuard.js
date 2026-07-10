@@ -11,6 +11,13 @@ export function currentUser(req) {
   return getSession(req.cookies?.[SESSION_COOKIE])
 }
 
+// Owner bucket for per-user provider OAuth tokens (SEC-1, lib/oauthTokens.js).
+// Local single-user mode has no login → everything shares 'local', which keeps
+// the frictionless localhost behavior; protected mode scopes by the Google user.
+export function tokenOwnerKey(user) {
+  return user?.email || user?.id || 'local'
+}
+
 // Gate for protected routes. No-op in local mode; 401 in protected mode without
 // a valid session. Always attaches req.user when a session exists.
 export function requireSession(req, res, next) {

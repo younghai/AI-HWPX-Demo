@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { AI_PROVIDERS } from '../lib/providers-config.js'
 import { rememberState, consumeState, oauthResultPage } from '../lib/oauth.js'
 import { setOAuthToken } from '../lib/oauthTokens.js'
+import { currentUser, tokenOwnerKey, AUTH_MODE } from '../lib/authGuard.js'
 
 export function createAuthRouter({ oauthBase, clientOrigin }) {
   const router = Router()
@@ -16,6 +17,11 @@ export function createAuthRouter({ oauthBase, clientOrigin }) {
     const clientId = process.env[provider.oauth.clientIdEnv]
     if (!clientId) {
       return res.status(400).send(`OAuth 설정이 필요합니다. .env에 ${provider.oauth.clientIdEnv}를 설정하세요.`)
+    }
+    // SEC-1: 토큰은 사용자별 버킷에 저장되므로 protected 모드에서는 로그인한
+    // 세션만 연결할 수 있다 — 익명 연결은 아무도 읽지 못하는 버킷에 들어갈 뿐이다.
+    if (AUTH_MODE === 'protected' && !currentUser(req)) {
+      return res.status(401).send('로그인 후 AI 프로바이더를 연결할 수 있습니다.')
     }
 
     const state = crypto.randomBytes(16).toString('hex')
@@ -50,6 +56,10 @@ export function createAuthRouter({ oauthBase, clientOrigin }) {
     if (!provider?.oauth) {
       return res.send(oauthResultPage(false, 'OAuth 미지원 프로바이더입니다.', clientOrigin))
     }
+    const sessionUser = currentUser(req)
+    if (AUTH_MODE === 'protected' && !sessionUser) {
+      return res.send(oauthResultPage(false, '로그인 세션이 만료되었습니다. 다시 로그인한 뒤 연결해 주세요.', clientOrigin))
+    }
 
     const clientId = process.env[provider.oauth.clientIdEnv]
     const clientSecret = process.env[provider.oauth.clientSecretEnv]
@@ -73,7 +83,8 @@ export function createAuthRouter({ oauthBase, clientOrigin }) {
       }
       // Store in the OAuth token store (in-memory, with expiry + refresh), NOT
       // the .env API-key slot — see lib/oauthTokens.js / review BE-05.
-      setOAuthToken(providerKey, {
+      // Scoped to the requesting user's bucket (SEC-1).
+      setOAuthToken(tokenOwnerKey(sessionUser), providerKey, {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         expiresInSec: tokenData.expires_in

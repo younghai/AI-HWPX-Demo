@@ -11,8 +11,10 @@ import { estimateUsage } from '../lib/usage.js'
 
 // Prefer a valid OAuth access token (refreshed if needed) for OAuth-connected
 // providers, falling back to the static API key. See review BE-05.
-async function resolveApiKey(provider, providerKey) {
-  const oauthToken = await getValidAccessToken(provider, providerKey)
+// userKey scopes the token lookup to the requesting user (SEC-1) — 'local' in
+// the no-login localhost mode.
+async function resolveApiKey(provider, providerKey, userKey = 'local') {
+  const oauthToken = await getValidAccessToken(provider, userKey, providerKey)
   return oauthToken || process.env[provider.envKey] || ''
 }
 
@@ -22,7 +24,7 @@ function callProviderOnce({ providerKey, provider, apiKey, model }, prompt, { sy
     : callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model, jsonMode })
 }
 
-export async function buildDraftWithAI(input, { onProgress } = {}) {
+export async function buildDraftWithAI(input, { onProgress, userKey = 'local' } = {}) {
   // Optional progress sink for the streaming route (review B2). No-op for the
   // plain JSON endpoint. Kept best-effort — a throwing sink never breaks generation.
   const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
@@ -44,7 +46,7 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
     throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
   }
 
-  const apiKey = (await resolveApiKey(provider, providerKey)) || clientKey
+  const apiKey = (await resolveApiKey(provider, providerKey, userKey)) || clientKey
   if (!provider.demo && !apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }
@@ -156,7 +158,7 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
 // Regenerate the body of a single section (review PO-01, section-level regenerate).
 // Returns plain body text — no JSON wrapper — so the OpenAI-compatible path is
 // given a plain-text system prompt instead of the JSON-forcing default.
-export async function regenerateSectionWithAI(input) {
+export async function regenerateSectionWithAI(input, { userKey = 'local' } = {}) {
   const heading = String(input.heading || '').trim()
   const title = String(input.title || '문서').trim()
   const docType = String(input.docType || 'report').trim()
@@ -172,7 +174,7 @@ export async function regenerateSectionWithAI(input) {
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
 
-  const apiKey = await resolveApiKey(provider, providerKey)
+  const apiKey = await resolveApiKey(provider, providerKey, userKey)
   if (!provider.demo && !apiKey) throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 입력해 주세요.`, 401)
 
   const docLabel = labelForDocType(docType)
@@ -210,7 +212,7 @@ ${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.j
 // generated independently so global coherence/de-dup is weaker). Whether the
 // latency win justifies the quality cost can only be judged with real API keys;
 // keep this off by default until measured. See B2 for the SSE progress channel.
-export async function buildDraftParallel(input, { onProgress } = {}) {
+export async function buildDraftParallel(input, { onProgress, userKey = 'local' } = {}) {
   const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
   const docType = String(input.docType || 'report').trim()
   const companyName = String(input.companyName || '회사명').trim()
@@ -220,7 +222,7 @@ export async function buildDraftParallel(input, { onProgress } = {}) {
 
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)
-  const apiKey = (await resolveApiKey(provider, providerKey)) || String(input.aiApiKey || '').trim()
+  const apiKey = (await resolveApiKey(provider, providerKey, userKey)) || String(input.aiApiKey || '').trim()
   if (!provider.demo && !apiKey) {
     throw createHttpError(`API 키가 설정되지 않았습니다. 환경변수 ${provider.envKey}를 설정하거나 UI에서 직접 입력해 주세요.`, 401)
   }

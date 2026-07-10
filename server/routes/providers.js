@@ -3,12 +3,14 @@ import { AI_PROVIDERS, knownEnvKeys } from '../lib/providers-config.js'
 import { writeEnvFile } from '../lib/env.js'
 import { sendError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from '../services/ai.js'
-import { requireSession } from '../lib/authGuard.js'
+import { requireSession, currentUser, tokenOwnerKey } from '../lib/authGuard.js'
 import { hasOAuthToken } from '../lib/oauthTokens.js'
 
 const router = Router()
 
-router.get('/api/providers', (_req, res) => {
+router.get('/api/providers', (req, res) => {
+  // SEC-1: OAuth 연결 상태는 요청 사용자의 토큰 버킷 기준으로 표시한다.
+  const owner = tokenOwnerKey(currentUser(req))
   const list = Object.entries(AI_PROVIDERS).map(([key, val]) => ({
     key,
     label: val.label,
@@ -17,7 +19,7 @@ router.get('/api/providers', (_req, res) => {
     models: (val.models || []).map((m) => ({ id: m.id, label: m.label })),
     // Demo needs no key, so it's always "configured"; real providers require an
     // env key or a stored OAuth token.
-    configured: val.demo ? true : (Boolean(process.env[val.envKey]) || hasOAuthToken(key)),
+    configured: val.demo ? true : (Boolean(process.env[val.envKey]) || hasOAuthToken(owner, key)),
     oauthSupported: Boolean(val.oauth && process.env[val.oauth?.clientIdEnv])
   }))
   res.json({ ok: true, providers: list })

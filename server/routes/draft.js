@@ -1,14 +1,14 @@
 import { Router } from 'express'
 import { buildDraftWithAI, buildDraftParallel, regenerateSectionWithAI } from '../services/draft.js'
 import { sendError } from '../lib/errors.js'
-import { requireSession } from '../lib/authGuard.js'
+import { requireSession, tokenOwnerKey } from '../lib/authGuard.js'
 import { record } from '../lib/metrics.js'
 
 const router = Router()
 
 router.post('/api/generate-draft', requireSession, async (req, res) => {
   try {
-    const draft = await buildDraftWithAI(req.body || {})
+    const draft = await buildDraftWithAI(req.body || {}, { userKey: tokenOwnerKey(req.user) })
     res.json({ ok: true, draft })
   } catch (error) {
     sendError(res, error)
@@ -33,7 +33,8 @@ router.post('/api/generate-draft/stream', requireSession, async (req, res) => {
     // Opt-in experimental parallel section generation (review C2). Off by default.
     const generate = req.body?.parallel === true ? buildDraftParallel : buildDraftWithAI
     const draft = await generate(req.body || {}, {
-      onProgress: (evt) => send('progress', { ...evt, elapsedMs: Date.now() - started })
+      onProgress: (evt) => send('progress', { ...evt, elapsedMs: Date.now() - started }),
+      userKey: tokenOwnerKey(req.user)
     })
     send('result', { ok: true, draft })
   } catch (error) {
@@ -48,7 +49,7 @@ router.post('/api/regenerate-section', requireSession, async (req, res) => {
   // vs. ai_draft count means users often reject the first section output.
   const started = Date.now()
   try {
-    const { body } = await regenerateSectionWithAI(req.body || {})
+    const { body } = await regenerateSectionWithAI(req.body || {}, { userKey: tokenOwnerKey(req.user) })
     record('section_regenerate', { ok: true, ms: Date.now() - started })
     res.json({ ok: true, body })
   } catch (error) {

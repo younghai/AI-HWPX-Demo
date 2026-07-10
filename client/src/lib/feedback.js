@@ -5,6 +5,10 @@ export function usageMessage(usage) {
   return `AI 응답 ${(usage.elapsedMs / 1000).toFixed(1)}초${cost}`
 }
 
+export function providerListErrorMessage() {
+  return 'AI provider 목록을 불러오지 못했습니다.'
+}
+
 export function diagramReportFeedback(dr) {
   if (!dr || dr.requestedCount <= 0) return null
   if (dr.embeddedCount === dr.requestedCount) {

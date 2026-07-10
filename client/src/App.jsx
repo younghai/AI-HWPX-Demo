@@ -16,7 +16,8 @@ import { useRhwp } from './hooks/useRhwp.js'
 import { useDraft } from './hooks/useDraft.js'
 import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
-import { diagramReportFeedback, usageMessage, validationFeedback } from './lib/feedback.js'
+import { useDocumentFlow } from './hooks/useDocumentFlow.js'
+import { providerListErrorMessage } from './lib/feedback.js'
 
 export default function App() {
   const previewPanelRef = useRef(null)
@@ -29,9 +30,7 @@ export default function App() {
   const [targetTitle, setTargetTitle] = useState('')
   const [docFields, setDocFields] = useState({})
   const [showSettings, setShowSettings] = useState(false)
-  const [stage, setStage] = useState('idle')
 
-  // Reset type-specific fields when the document type changes.
   function handleDocTypeChange(next) {
     setDocType(next)
     setDocFields({})
@@ -42,190 +41,41 @@ export default function App() {
 
   const { user, logout, loginWithPopup } = useAuth()
   const autoLogin = import.meta.env.VITE_AUTO_LOGIN === 'true'
-  const { toasts, dismiss, success, error: errorToast, info } = useToast()
+  const toast = useToast()
 
-  const {
-    providers, aiProvider, setAiProvider, refresh: refreshProviders, activeProvider, hasConfigured, hasDemo,
-    aiModel, setAiModel, activeModels
-  } = useProviders((err) => {
+  const providersInfo = useProviders((err) => {
     console.warn('providers fetch failed', err)
-    errorToast('AI provider 목록을 불러오지 못했습니다.')
+    toast.error(providerListErrorMessage())
   })
 
-  // When the user has no real key, fall back to the demo provider (placeholder
-  // content, no network) so the full flow is still reachable. A1 데모 모드.
-  const usingDemo = !hasConfigured && hasDemo
-  const effectiveProvider = usingDemo ? 'mock' : aiProvider
-  const effectiveModel = usingDemo ? 'mock' : aiModel
-
-  const {
-    sourceInsight,
-    parseStatus,
-    setParseStatus,
-    parseFile,
-    builtPreview,
-    renderBuiltHwpx,
-    clearBuiltPreview,
-    exportBuiltPdf
-  } = useRhwp()
-  const [pdfBusy, setPdfBusy] = useState(false)
-  const {
-    draft, setDraft, draftLoading, exportState, generateDraft, buildHwpx, downloadBuilt, cancelAll,
-    updateSection, addSection, removeSection, moveSection, updateTitle, regenerateSection,
-    recoverable, recoverDraft, dismissRecovery
-  } = useDraft({ setParseStatus })
-
-  const [editing, setEditing] = useState(false)
-
-  // Shared context for section-level regenerate + build (review PO-01).
-  function draftContext() {
-    return { docType, companyName, goal, notes, docFields, sourceText: sourceInsight.extractedText, aiProvider: effectiveProvider, model: effectiveModel }
-  }
-
-  function handleCancel() {
-    cancelAll()
-    setStage('idle')
-    setParseStatus('작업을 취소했습니다.')
-  }
-
-  async function handleFileSelect(file) {
-    setStage('idle')
-    setEditing(false)
-    if (!file) {
-      setSourceFile(null)
-      setDraft(null)
-      clearBuiltPreview()
-      setParseStatus('업로드한 문서를 분석하면 여기 상태가 표시됩니다.')
-      return
+  const usingDemo = !providersInfo.hasConfigured && providersInfo.hasDemo
+  const effectiveProvider = usingDemo ? 'mock' : providersInfo.aiProvider
+  const effectiveModel = usingDemo ? 'mock' : providersInfo.aiModel
+  const rhwp = useRhwp()
+  const draftApi = useDraft({ setParseStatus: rhwp.setParseStatus })
+  const flow = useDocumentFlow({
+    rhwp,
+    draftApi,
+    toast,
+    providersInfo: {
+      hasConfigured: providersInfo.hasConfigured, hasDemo: providersInfo.hasDemo, usingDemo,
+      effectiveProvider, effectiveModel, openSettings: () => setShowSettings(true)
+    },
+    previewPanelRef,
+    form: {
+      sourceFile, setSourceFile, docType, setDocType, companyName, goal, notes,
+      targetTitle, setTargetTitle, docFields
     }
-    setSourceFile(file)
-    setDraft(null)
-    clearBuiltPreview()
-    await parseFile(file)
-    if (!targetTitle) {
-      setTargetTitle(file.name.replace(/\.(hwp|hwpx)$/i, ''))
-    }
-  }
-
-  async function handleTrySample({ file, sample }) {
-    if (sample?.suggestedTitle) setTargetTitle(sample.suggestedTitle)
-    if (sample?.docType) setDocType(sample.docType)
-    info(`샘플 "${sample.label}" 을 불러왔습니다.`)
-    await handleFileSelect(file)
-  }
-
-  function scrollToPreview() {
-    requestAnimationFrame(() => {
-      previewPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  // Step 1 of the loop: generate the draft, then hand off to the editor for
-  // review/edit. Building the HWPX is a separate, explicit step (handleBuild).
-  async function handleGenerate() {
-    // Only hard-block when there's neither a real key nor the demo provider.
-    if (!hasConfigured && !hasDemo) {
-      errorToast('먼저 우측 상단 ⚙ 버튼에서 AI 키를 설정해주세요.', {
-        action: { label: '설정 열기', onClick: () => setShowSettings(true) }
-      })
-      return
-    }
-    if (usingDemo) {
-      info('데모 모드로 예시 초안을 생성합니다. 실제 AI 응답이 아니며, API 키를 연결하면 실제 생성이 가능합니다.')
-    }
-    clearBuiltPreview()
-    setEditing(true)
-    setStage('generating')
-    const next = await generateDraft({
-      sourceFile, sourceInsight, docType, companyName, goal, notes, targetTitle, docFields,
-      aiProvider: effectiveProvider, aiModel: effectiveModel, onOptimistic: scrollToPreview
-    })
-    if (!next) {
-      setStage('error')
-      scrollToPreview()
-      errorToast('AI 초안 생성에 실패했습니다. 우측 패널의 메시지를 확인해주세요.')
-      return
-    }
-    if (next.title) setTargetTitle(next.title)
-    if (next.usage) info(usageMessage(next.usage))
-    setStage('idle')
-    setParseStatus('AI 초안이 준비됐습니다. 내용을 검토·수정한 뒤 "이 초안으로 HWPX 생성"을 누르세요.')
-    scrollToPreview()
-  }
-
-  // Step 2: build the HWPX from the (possibly edited) draft, then render it.
-  async function handleBuild() {
-    if (!draft) return
-    setEditing(false)
-    setStage('building')
-    setParseStatus('초안 내용을 바탕으로 HWPX 파일을 생성하는 중입니다...')
-    const built = await buildHwpx({ draftOverride: draft, sourceFile, sourceInsight, docType, docFields })
-    if (built?.url) {
-      setStage('rendering')
-      setParseStatus('HWPX를 렌더링해 미리보기에 반영합니다...')
-      const rendered = await renderBuiltHwpx(built.url, built.fileName)
-      setParseStatus(rendered
-        ? '미리보기와 다운로드 파일이 동일한 HWPX로 생성되었습니다.'
-        : 'HWPX 파일이 생성되었습니다. 다운로드 버튼으로 받을 수 있습니다.')
-      setStage('done')
-      const diagramFeedback = diagramReportFeedback(built.diagramReport)
-      if (diagramFeedback) {
-        if (diagramFeedback.kind === 'info') info(diagramFeedback.text)
-        else errorToast(diagramFeedback.text)
-      }
-      const validation = validationFeedback(built.validation)
-      if (validation) {
-        if (validation.kind === 'success') success(validation.text)
-        else if (validation.kind === 'info') info(validation.text)
-        else errorToast(validation.text)
-      }
-    } else {
-      setEditing(true)
-      setStage('error')
-      errorToast('HWPX 빌드에 실패했습니다.')
-    }
-    scrollToPreview()
-  }
-
-  function handleRegenerateSection(index) {
-    return regenerateSection(index, draftContext())
-  }
-
-  function handleEditAgain() {
-    setEditing(true)
-    setStage('idle')
-  }
-
-  function handleDownload() {
-    downloadBuilt()
-  }
-
-  async function handleDownloadPdf() {
-    if (pdfBusy) return
-    setPdfBusy(true)
-    try {
-      const ok = await exportBuiltPdf(exportState.fileName)
-      if (ok) success('PDF를 내려받았습니다. (미리보기 기준 — 원본 서식은 HWPX가 정확합니다)')
-      else errorToast('PDF로 변환할 문서가 없습니다. 먼저 HWPX를 생성해 주세요.')
-    } catch (err) {
-      console.warn('pdf export failed', err)
-      errorToast('PDF 변환에 실패했습니다.')
-    } finally {
-      setPdfBusy(false)
-    }
-  }
-
-  const showEmptyState = !sourceFile && !draft && !builtPreview.svgs.length
-  const showEditor = Boolean(draft) && (editing || !builtPreview.svgs.length)
+  })
 
   return (
     <ErrorBoundary>
       <div className="app-shell">
         {autoLogin && <LoginOverlay onLogin={loginWithPopup} user={user} />}
       <TopBar
-        hasConfigured={hasConfigured}
+        hasConfigured={providersInfo.hasConfigured}
         usingDemo={usingDemo}
-        activeProviderLabel={activeProvider?.label}
+        activeProviderLabel={providersInfo.activeProvider?.label}
         onOpenSettings={() => setShowSettings(true)}
         user={user}
         onLogin={loginWithPopup}
@@ -234,76 +84,76 @@ export default function App() {
 
       <ProviderSettings
         open={showSettings}
-        providers={providers}
-        aiProvider={aiProvider}
-        setAiProvider={setAiProvider}
-        refreshProviders={refreshProviders}
+        providers={providersInfo.providers}
+        aiProvider={providersInfo.aiProvider}
+        setAiProvider={providersInfo.setAiProvider}
+        refreshProviders={providersInfo.refresh}
         onClose={() => setShowSettings(false)}
       />
 
       <main className="workspace">
         <ControlPanel
-          onFileSelect={handleFileSelect}
+          onFileSelect={flow.handleFileSelect}
           sourceFile={sourceFile}
-          sourceInsight={sourceInsight}
+          sourceInsight={rhwp.sourceInsight}
           docType={docType} setDocType={handleDocTypeChange}
           docFields={docFields} setDocField={setDocField}
           companyName={companyName} setCompanyName={setCompanyName}
           targetTitle={targetTitle} setTargetTitle={setTargetTitle}
           goal={goal} setGoal={setGoal}
           notes={notes} setNotes={setNotes}
-          activeModels={activeModels} aiModel={aiModel} setAiModel={setAiModel}
-          onGenerate={handleGenerate}
-          onDownload={handleDownload}
-          onDownloadPdf={handleDownloadPdf}
-          canDownloadPdf={builtPreview.svgs.length > 0}
-          pdfBusy={pdfBusy}
-          draftLoading={draftLoading}
-          exportState={exportState}
-          hasDraft={Boolean(draft)}
+          activeModels={providersInfo.activeModels} aiModel={providersInfo.aiModel} setAiModel={providersInfo.setAiModel}
+          onGenerate={flow.handleGenerate}
+          onDownload={flow.handleDownload}
+          onDownloadPdf={flow.handleDownloadPdf}
+          canDownloadPdf={rhwp.builtPreview.svgs.length > 0}
+          pdfBusy={flow.pdfBusy}
+          draftLoading={draftApi.draftLoading}
+          exportState={draftApi.exportState}
+          hasDraft={Boolean(draftApi.draft)}
           usingDemo={usingDemo}
-          parseStatus={parseStatus}
+          parseStatus={rhwp.parseStatus}
         />
 
         <div className="preview-column">
-          {recoverable && !draft && (
-            <RecoveryBanner recoverable={recoverable} onRecover={recoverDraft} onDismiss={dismissRecovery} />
+          {draftApi.recoverable && !draftApi.draft && (
+            <RecoveryBanner recoverable={draftApi.recoverable} onRecover={draftApi.recoverDraft} onDismiss={draftApi.dismissRecovery} />
           )}
 
-          {showEmptyState && <EmptyState onTrySample={handleTrySample} />}
+          {flow.showEmptyState && <EmptyState onTrySample={flow.handleTrySample} />}
 
-          <ProgressStepper stage={stage} onCancel={handleCancel} />
+          <ProgressStepper stage={flow.stage} onCancel={flow.handleCancel} />
 
           <PreviewPanel
             ref={previewPanelRef}
-            draft={draft}
-            sourceInsight={sourceInsight}
+            draft={draftApi.draft}
+            sourceInsight={rhwp.sourceInsight}
             docType={docType}
-            parseStatus={parseStatus}
-            builtPreview={builtPreview}
-            showEditor={showEditor}
-            editing={editing}
-            building={exportState.loading}
-            canRegenerate={hasConfigured || hasDemo}
-            onTitleChange={updateTitle}
-            onSectionChange={updateSection}
-            onAddSection={addSection}
-            onRemoveSection={removeSection}
-            onMoveSection={moveSection}
-            onRegenerateSection={handleRegenerateSection}
-            onBuild={handleBuild}
-            onEditAgain={handleEditAgain}
+            parseStatus={rhwp.parseStatus}
+            builtPreview={rhwp.builtPreview}
+            showEditor={flow.showEditor}
+            editing={flow.editing}
+            building={draftApi.exportState.loading}
+            canRegenerate={providersInfo.hasConfigured || providersInfo.hasDemo}
+            onTitleChange={draftApi.updateTitle}
+            onSectionChange={draftApi.updateSection}
+            onAddSection={draftApi.addSection}
+            onRemoveSection={draftApi.removeSection}
+            onMoveSection={draftApi.moveSection}
+            onRegenerateSection={flow.handleRegenerateSection}
+            onBuild={flow.handleBuild}
+            onEditAgain={flow.handleEditAgain}
           />
 
-          {exportState.validation && (
-            <ValidationPanel validation={exportState.validation} />
+          {draftApi.exportState.validation && (
+            <ValidationPanel validation={draftApi.exportState.validation} />
           )}
 
-          <HistoryPanel refreshKey={exportState.url} />
+          <HistoryPanel refreshKey={draftApi.exportState.url} />
         </div>
       </main>
 
-      <ToastContainer toasts={toasts} onDismiss={dismiss} />
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
     </div>
     </ErrorBoundary>
   )

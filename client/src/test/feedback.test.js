@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diagramReportFeedback, usageMessage, validationFeedback } from '../lib/feedback.js'
+import { diagramReportFeedback, providerListErrorMessage, usageMessage, validationFeedback } from '../lib/feedback.js'
 
 describe('usageMessage', () => {
   it('returns an empty message when usage is missing', () => {
@@ -19,6 +19,12 @@ describe('usageMessage', () => {
   it('omits the cost when the estimate is zero', () => {
     expect(usageMessage({ elapsedMs: 1234, estCostUsd: 0, tokensMeasured: false }))
       .toBe('AI 응답 1.2초')
+  })
+})
+
+describe('providerListErrorMessage', () => {
+  it('returns the provider list load failure toast text', () => {
+    expect(providerListErrorMessage()).toBe('AI provider 목록을 불러오지 못했습니다.')
   })
 })
 

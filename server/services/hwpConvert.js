@@ -2,14 +2,11 @@ import crypto from 'crypto'
 import { existsSync } from 'fs'
 import fs from 'fs/promises'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { spawn, spawnSync } from 'child_process'
 import { logger } from '../lib/logger.js'
 import { JAVA_BIN } from '../lib/config.js'
+import { repoRoot } from '../lib/paths.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, '..', '..')
 const vendorDir = path.join(repoRoot, 'vendor', 'hwpconverter')
 const converterJar = path.join(vendorDir, 'hwpConverter.jar')
 const converterLibGlob = path.join(vendorDir, 'lib', '*')

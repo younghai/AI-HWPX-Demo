@@ -12,16 +12,13 @@
  */
 import fs from 'fs/promises'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { runProcess } from '../lib/utils.js'
 import { POLARIS_DVC_CLI } from '../lib/config.js'
+import { repoRoot } from '../lib/paths.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const v3Root = path.resolve(__dirname, '..', '..')
-const defaultBin = path.join(v3Root, 'tools', 'bin', 'polaris-dvc')
-const fallbackSpec = path.join(v3Root, 'tools', 'polaris-dvc-spec.json')
-const specsDir = path.join(v3Root, 'specs')
+const defaultBin = path.join(repoRoot, 'tools', 'bin', 'polaris-dvc')
+const fallbackSpec = path.join(repoRoot, 'tools', 'polaris-dvc-spec.json')
+const specsDir = path.join(repoRoot, 'specs')
 
 const binPath = POLARIS_DVC_CLI || defaultBin
 
@@ -112,7 +109,7 @@ export async function validateWithPolarisDvc(hwpxPath, { docType, enableSchema =
   if (enableSchema) args.push('--enable-schema')
   args.push(hwpxPath)
 
-  const result = await runProcess(binPath, args, v3Root, { timeoutMs: 15000 })
+  const result = await runProcess(binPath, args, repoRoot, { timeoutMs: 15000 })
   const raw = result.stdout.trim()
   let rawViolations = []
   try {

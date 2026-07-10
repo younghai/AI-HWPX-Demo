@@ -1,13 +1,10 @@
 import { Router } from 'express'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import fs from 'fs/promises'
 import { sendError } from '../lib/errors.js'
+import { repoRoot } from '../lib/paths.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const v4Root = path.resolve(__dirname, '..', '..')
-const samplesDir = path.join(v4Root, 'templates', 'samples')
+const samplesDir = path.join(repoRoot, 'templates', 'samples')
 
 // Starter template gallery (review B3). Each is a valid HWPX pre-structured for
 // its document type (regenerate with scripts/gen_sample_templates.py). One click

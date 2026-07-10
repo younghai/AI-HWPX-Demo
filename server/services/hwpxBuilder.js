@@ -1,9 +1,8 @@
 import fs from 'fs/promises'
-import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-import { fileURLToPath } from 'url'
 import { createHttpError } from '../lib/errors.js'
+import { repoRoot, scriptsDir, generatedDirectory, workDirectory, pythonCmd } from '../lib/paths.js'
 import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { parseSectionsPayload } from '../lib/sections.js'
@@ -14,23 +13,12 @@ import { convertHwpToHwpx, isHwpConverterAvailable } from './hwpConvert.js'
 import { logger } from '../lib/logger.js'
 import { record } from '../lib/metrics.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const v4Root = path.resolve(__dirname, '..', '..')
-const scriptsDir = path.join(v4Root, 'scripts')
 const buildScript = path.join(scriptsDir, 'build_hwpx.py')
-const generatedDir = path.join(v4Root, 'generated')
-// Private work dir (NOT served) for uploaded originals + sections JSON, so they
-// are never exposed via /generated and can't collide across concurrent requests.
-const workDir = path.join(v4Root, '.work')
 
-const venvPython = path.join(v4Root, '.venv', 'bin', 'python3')
-const pythonCmd = existsSync(venvPython) ? venvPython : 'python3'
-
-await fs.mkdir(generatedDir, { recursive: true })
-await fs.mkdir(workDir, { recursive: true })
-
-export const generatedDirectory = generatedDir
+// 이 서비스가 두 디렉토리의 쓰기 주체이므로 생성도 여기서 보장한다
+// (경로 상수 자체는 lib/paths.js 가 단일 출처).
+await fs.mkdir(generatedDirectory, { recursive: true })
+await fs.mkdir(workDirectory, { recursive: true })
 
 // Map build_hwpx.py's structured stdout error (see its _emit_error) to a
 // user-safe message + HTTP status. Falls back to a generic message so raw
@@ -105,7 +93,7 @@ export async function buildHwpx({ title, sourceMode, sourceFile, diagramImages =
   // Unpredictable, collision-free output name (review BE-04/BE-12). The slug is
   // kept as a human hint; the UUID prevents enumeration and same-ms collisions.
   const outputName = `${slugify(title) || 'generated'}-${crypto.randomUUID()}.hwpx`
-  const outputPath = path.join(generatedDir, outputName)
+  const outputPath = path.join(generatedDirectory, outputName)
 
   let templatePath = null
   let uploadedHwpPath = null
@@ -114,14 +102,14 @@ export async function buildHwpx({ title, sourceMode, sourceFile, diagramImages =
 
   if (sourceFile && sourceFile.originalname.toLowerCase().endsWith('.hwpx')) {
     // Uploaded original goes to the private work dir, never the served dir.
-    const uploadPath = path.join(workDir, `${crypto.randomUUID()}.hwpx`)
+    const uploadPath = path.join(workDirectory, `${crypto.randomUUID()}.hwpx`)
     await fs.writeFile(uploadPath, sourceFile.buffer)
     templatePath = uploadPath
     templateMode = 'hwpx'
   } else if (sourceFile && sourceFile.originalname.toLowerCase().endsWith('.hwp') && isHwpConverterAvailable()) {
-    uploadedHwpPath = path.join(workDir, `${crypto.randomUUID()}.hwp`)
+    uploadedHwpPath = path.join(workDirectory, `${crypto.randomUUID()}.hwp`)
     await fs.writeFile(uploadedHwpPath, sourceFile.buffer)
-    const convertedPath = await convertHwpToHwpx(uploadedHwpPath, workDir)
+    const convertedPath = await convertHwpToHwpx(uploadedHwpPath, workDirectory)
     if (convertedPath) {
       templatePath = convertedPath
       templateMode = 'converted-hwp'
@@ -138,21 +126,21 @@ export async function buildHwpx({ title, sourceMode, sourceFile, diagramImages =
     onDiagramWarning: (err) => logger.warn({ err: err.message }, 'diagrams JSON parse failed — proceeding without diagrams')
   })
   if (combined) {
-    diagramPngPaths = await attachDiagramPngs(combined, diagramImages, workDir)
-    sectionsJsonPath = path.join(workDir, `${crypto.randomUUID()}-sections.json`)
+    diagramPngPaths = await attachDiagramPngs(combined, diagramImages, workDirectory)
+    sectionsJsonPath = path.join(workDirectory, `${crypto.randomUUID()}-sections.json`)
     await fs.writeFile(sectionsJsonPath, JSON.stringify(combined), 'utf-8')
   }
 
   let docFieldsJsonPath = null
   const resolvedFields = resolveDocFieldValues(docType, docFields)
   if (resolvedFields.length) {
-    docFieldsJsonPath = path.join(workDir, `${crypto.randomUUID()}-docfields.json`)
+    docFieldsJsonPath = path.join(workDirectory, `${crypto.randomUUID()}-docfields.json`)
     await fs.writeFile(docFieldsJsonPath, JSON.stringify(resolvedFields), 'utf-8')
   }
 
   // Diagram embed report (review D2): the worker writes requested/embedded/skipped
   // here so we can surface "N/M개 반영" and warn on silent drops.
-  const reportJsonPath = path.join(workDir, `${crypto.randomUUID()}-report.json`)
+  const reportJsonPath = path.join(workDirectory, `${crypto.randomUUID()}-report.json`)
 
   const args = [
     buildScript,
@@ -180,7 +168,7 @@ export async function buildHwpx({ title, sourceMode, sourceFile, diagramImages =
   let result
   let diagramReport = null
   try {
-    result = await runProcess(pythonCmd, args, v4Root, { env: pythonEnv })
+    result = await runProcess(pythonCmd, args, repoRoot, { env: pythonEnv })
     try {
       diagramReport = JSON.parse(await fs.readFile(reportJsonPath, 'utf-8'))
     } catch {

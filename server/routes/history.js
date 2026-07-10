@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import { requireSession } from '../lib/authGuard.js'
 import { sendError } from '../lib/errors.js'
-import { generatedDirectory } from '../services/hwpxBuilder.js'
+import { generatedDirectory } from '../lib/paths.js'
 
 const router = Router()
 const MAX_HISTORY = 20

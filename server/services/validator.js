@@ -1,16 +1,13 @@
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { runProcess } from '../lib/utils.js'
 import { validateWithPolarisDvc } from './polarisValidator.js'
+import { repoRoot, scriptsDir, pythonCmd } from '../lib/paths.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const v3Root = path.resolve(__dirname, '..', '..')
-const validatorScript = path.join(v3Root, 'scripts', 'validators', 'validate.py')
+const validatorScript = path.join(scriptsDir, 'validators', 'validate.py')
 
 async function runNativeValidator(hwpxPath) {
   try {
-    const result = await runProcess('python3', [validatorScript, hwpxPath, '--format=json'], v3Root, { timeoutMs: 15000 })
+    const result = await runProcess(pythonCmd, [validatorScript, hwpxPath, '--format=json'], repoRoot, { timeoutMs: 15000 })
     const raw = result.stdout.trim()
     if (!raw) return { violations: [], note: '검증기가 출력을 내지 않았습니다.' }
     try {

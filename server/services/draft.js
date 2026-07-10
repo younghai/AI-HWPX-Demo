@@ -131,12 +131,6 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
     elapsedMs
   })
 
-  const lines = effectiveText
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index)
-
   const usage = {
     elapsedMs: usageEstimate.elapsedMs,
     attempts,
@@ -155,7 +149,6 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
     toc: validated.sections.map((s) => s.heading),
     sections: validated.sections,
     diagrams: validated.diagrams,
-    sourceExcerpt: lines.slice(0, 8),
     engine: provider.label
   }
 }
@@ -293,7 +286,6 @@ export async function buildDraftParallel(input, { onProgress } = {}) {
     toc,
     sections,
     diagrams: [],
-    sourceExcerpt: [],
     engine: `${provider.label} (parallel)`
   }
 }

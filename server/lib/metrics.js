@@ -18,19 +18,6 @@ export function record(name, { ok, ms }) {
   }
 }
 
-// Time an async operation and record it under `name`. Re-throws after recording.
-export async function timed(name, fn) {
-  const started = Date.now()
-  try {
-    const result = await fn()
-    record(name, { ok: true, ms: Date.now() - started })
-    return result
-  } catch (err) {
-    record(name, { ok: false, ms: Date.now() - started })
-    throw err
-  }
-}
-
 export function snapshot() {
   const out = {}
   for (const [name, b] of Object.entries(counters)) {

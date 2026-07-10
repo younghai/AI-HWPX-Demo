@@ -2,6 +2,12 @@ import { escapeXml } from '../../../shared/escape.js'
 
 const xe = escapeXml
 
+// 다이어그램 캔버스 크기(px) — 단일 출처. rasterize.js 의 PNG 크기가 이 값을
+// import 하고, python 폴백 렌더(scripts/hwpx/diagrams.py 의 cairosvg
+// output_width/height)도 같은 값이어야 client PNG 와 서버 렌더가 일치한다.
+export const DIAGRAM_W = 605
+export const DIAGRAM_H = 302
+
 const D = {
   PAPER: '#faf7f2', INK: '#1c1917', MUTED: '#78716c',
   ACCENT: '#b5523a', RULE: 'rgba(28,25,23,0.12)',
@@ -15,7 +21,7 @@ const D = {
   // 'Apple SD Gothic Neo' leads instead of the unloaded 'Pretendard' webfont.
   FONT: "'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', 'Noto Sans KR', 'Pretendard', sans-serif",
   MONO: "'D2Coding', 'Courier New', monospace",
-  W: 605, H: 302
+  W: DIAGRAM_W, H: DIAGRAM_H
 }
 
 function _dotGrid() {

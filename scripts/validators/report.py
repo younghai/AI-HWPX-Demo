@@ -11,15 +11,13 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 
-# polaris_dvc 축 정의와 일치
-AXIS_RULE = "rule"             # JID 1000–7999
+# polaris_dvc 축 정의와 일치. rule(JID 1000–7999)/schema(JID 13000–13999) 축과
+# info 심각도는 polaris 엔진 통합 시 함께 추가한다 — 미사용 상수를 미리 두지 않는다.
 AXIS_STRUCTURE = "structure"   # JID 11000–11999
 AXIS_CONTAINER = "container"   # JID 12000–12999
-AXIS_SCHEMA = "schema"         # JID 13000–13999
 
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
-SEVERITY_INFO = "info"
 
 
 @dataclass

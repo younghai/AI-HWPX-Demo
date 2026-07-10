@@ -4,8 +4,7 @@
 // in the downloaded HWPX — so "preview == download" holds by construction, and
 // the server no longer needs the native cairosvg/libcairo to render diagrams.
 
-const DIAGRAM_W = 605
-const DIAGRAM_H = 302
+import { DIAGRAM_W, DIAGRAM_H } from './diagrams.js'
 
 // An <img> needs explicit width/height on the root <svg> to rasterize at full
 // resolution. rhwp page SVGs already carry width/height, so we must STRIP the

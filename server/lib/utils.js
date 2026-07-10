@@ -29,10 +29,6 @@ export function slugify(value) {
     .replace(/^-+|-+$/g, '')
 }
 
-export function sanitizeName(value) {
-  return String(value).normalize('NFC').replace(/[^a-zA-Z0-9._\-가-힣]/g, '-')
-}
-
 const SIGKILL_GRACE_MS = 5000
 
 export async function runProcess(command, args, cwd, { timeoutMs = 60000, env } = {}) {

@@ -64,12 +64,6 @@ export function withSectionIds(draft) {
 }
 
 export function buildOptimisticDraft({ sourceInsight, docType, companyName, targetTitle }) {
-  const lines = String(sourceInsight.extractedText || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  const excerpt = lines.slice(0, 8)
   const toc = buildToc(docType)
   const inferredTitle = targetTitle
     || (sourceInsight.fileName ? sourceInsight.fileName.replace(/\.(hwp|hwpx)$/i, '') : '문서 초안')
@@ -83,21 +77,8 @@ export function buildOptimisticDraft({ sourceInsight, docType, companyName, targ
     summary: `${companyName} 기준으로 ${labelForDocType(docType)} 초안을 생성하는 중입니다…`,
     toc,
     sections: toc.map((heading) => ({ id: newSectionId(), heading, body: '' })),
-    sourceExcerpt: excerpt,
     engine: 'optimistic-preview'
   }
-}
-
-export function getDraftStageItems() {
-  return ['원본 문서 분석 완료', '목차 재구성', '초안 생성 완료']
-}
-
-export function getDraftItemStatus(draft) {
-  return draft?.engine === 'optimistic-preview' ? '준비 중' : '생성됨'
-}
-
-export function getDraftSectionLabel(draft) {
-  return draft?.engine === 'optimistic-preview' ? 'AI 초안 구성 중' : '원문 기반 · AI 재구성'
 }
 
 export function triggerDownload(url, fileName) {

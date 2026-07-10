@@ -267,14 +267,17 @@ def apply_smart_replacements(
                 index, anchor_para, remaining, body_template, heading_style_id
             )
 
-    # ── P0 FIX ─────────────────────────────────────────────────────────────
-    # AI 가 매핑하지 않은 섹션(toc 길이 초과 범위) 의 모든 body 단락도 비운다.
-    # 그렇지 않으면 사용자 템플릿 본문의 샘플 문장이 "시장 내 경쟁력을 강화..." 처럼
-    # 수십 번 반복 출력된다. 미리보기와 다운로드 결과의 내용을 정확히 일치시키는 핵심.
-    # (heading 자체는 원본 유지 — 사용자가 수동 편집할 수 있도록)
+    # ── P0 FIX + INV-2 ──────────────────────────────────────────────────────
+    # AI 가 매핑하지 않은 섹션(toc 길이 초과 범위)은 heading 과 body 를 모두 비운다.
+    # body 를 남기면 템플릿 샘플 문장이 반복 노출되고, heading 을 남기면 편집기
+    # 미리보기에 없는 헤딩이 다운로드에만 나타난다 — 둘 다 "미리보기 == 다운로드"
+    # 절대 원칙 위반. (과거 'heading 은 수동 편집용으로 유지' 결정은 인앱 편집기
+    # 도입 전의 것 — 섹션 추가는 이제 편집기에서 하고, 슬롯 초과는 BUG-1 수정이
+    # 삽입으로 처리한다.) 문단은 제거하지 않고 비우기만 하므로 문단 수·구조 불변.
     for i, sec in enumerate(sections):
         if i < len(toc):
             continue  # 위 루프에서 이미 처리됨
+        _normalize_paragraph(sec['heading_p'], "")
         for body_p in sec['body_ps']:
             _normalize_paragraph(body_p, "")
 

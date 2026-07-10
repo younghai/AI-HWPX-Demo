@@ -185,6 +185,23 @@ def test_duplicate_headings_keep_all_sections(tmp_path: Path):
     assert _heading_texts(output_xml)[:2] == ["중복 헤딩", "중복 헤딩"]
 
 
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_unmapped_template_headings_are_blanked(tmp_path: Path):
+    """INV-2: toc 를 넘는 템플릿 heading 은 body 처럼 비운다 — 편집기 미리보기에
+    없는 헤딩이 다운로드에만 나타나는 preview≠download 를 막는다."""
+    toc = ["첫 섹션", "둘째 섹션"]
+    sections = [
+        {"heading": toc[0], "body": "INV2_A 본문."},
+        {"heading": toc[1], "body": "INV2_B 본문."},
+    ]
+
+    output = _build_hwpx(tmp_path, sections, None)
+    output_xml = _section_xml(output)
+
+    # 채워진 2개 외에 비어 있지 않은 heading 이 남아 있으면 안 된다.
+    assert _heading_texts(output_xml) == toc
+
+
 @pytest.mark.skipif(not SLOTLESS_FIXTURE.exists(), reason="mapper slotless fixture missing")
 def test_body_slotless_heading_inserts_paragraphs(tmp_path: Path):
     toc = ["슬롯리스 첫 섹션", "슬롯리스 둘째 섹션"]

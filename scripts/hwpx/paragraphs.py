@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 import xml.etree.ElementTree as ET
 
 from hwpx.namespaces import HP, qn
@@ -47,10 +49,16 @@ def _normalize_paragraph(p: ET.Element, text: str) -> None:
       computes line breaks based on the new text width, not the original."""
     runs = p.findall(qn("run", HP))
     if not runs:
+        # 적용 불가를 조용히 넘기지 않는다 (INV-5) — 빈 문단에 빈 텍스트는 정상 no-op.
+        if text:
+            logging.warning("normalize_paragraph: paragraph has no runs — text not applied (text=%r)", text[:40])
         return
 
     text_runs = [r for r in runs if _is_text_only_run(r)]
     if not text_runs:
+        # 텍스트 전용 run 이 없는 문단(그림 등 혼합 run 뿐). 쓰기는 소실되고,
+        # 비우기 실패는 placeholder 누수로 이어질 수 있어 관찰 가능하게 남긴다 (INV-5).
+        logging.warning("normalize_paragraph: no text-only run — cannot apply (text=%r)", text[:40])
         return
 
     first_run = text_runs[0]
@@ -81,12 +89,24 @@ def _normalize_paragraph(p: ET.Element, text: str) -> None:
             segs[0].set('textpos', '0')
 
 
+# 열거 번호만 남은 조각("1.", "12.") — 다음 조각에 붙여 "1. 항목" 이 두 문단으로
+# 쪼개지지 않게 한다 (INV-6). 소수점("3.5")은 점+공백이 아니라 애초에 분리되지 않는다.
+_ENUMERATOR_ONLY = re.compile(r"\d{1,2}\.")
+
+
 def _split_body_sentences(body_text: str) -> list[str]:
     """Split AI body text into sentence-sized chunks for paragraph distribution."""
     if not body_text:
         return []
     normalized = body_text.replace('. ', '.\n').replace('? ', '?\n').replace('! ', '!\n')
-    return [s.strip() for s in normalized.splitlines() if s.strip()]
+    parts = [s.strip() for s in normalized.splitlines() if s.strip()]
+    merged: list[str] = []
+    for part in parts:
+        if merged and _ENUMERATOR_ONLY.fullmatch(merged[-1]):
+            merged[-1] = f"{merged[-1]} {part}"
+        else:
+            merged.append(part)
+    return merged
 
 
 def _clone_paragraph_for_text(template_p: ET.Element, text: str) -> ET.Element:

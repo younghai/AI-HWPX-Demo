@@ -85,28 +85,29 @@ def normalize_toc(raw_toc: str | None, template_name: str) -> list[str]:
     return items
 
 
-def update_preview(preview_path: Path, title: str, toc: list[str], source_document: str) -> None:
-    lines = [
-        "<>",
-        f"<{title}>",
-        f"<원본: {source_document}>",
-        "",
-        "개요",
-        "원본 문서 스타일과 섹션 구조를 유지하면서 새 제목과 목차를 반영한 데모 문서입니다.",
-        "",
-        "목차",
-    ]
-    lines.extend(f"{index + 1}. {item}" for index, item in enumerate(toc))
-    lines.extend(
-        [
-            "",
-            "프로세스",
-            "1. HWPX 압축 해제",
-            "2. XML 텍스트 노드 치환",
-            "3. HWPX 재패키징",
-        ]
-    )
-    preview_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def update_preview(
+    preview_path: Path,
+    title: str,
+    toc: list[str],
+    source_document: str,
+    section_items: list[dict] | None = None,
+) -> None:
+    """Preview/PrvText.txt 를 실제 문서 내용으로 채운다 (INV-3).
+
+    한컴 오피스·파일 관리자의 텍스트 미리보기 패널이 이 파일을 보여주므로,
+    고정 보일러플레이트가 아니라 본문과 같은 내용이어야 "미리보기 == 다운로드"
+    원칙이 산출물 내부에서도 성립한다."""
+    items = section_items or []
+    lines = [title, f"<원본: {source_document}>", ""]
+    for k, heading in enumerate(toc):
+        lines.append(heading)
+        body = items[k]["body"] if k < len(items) else ""
+        if body:
+            lines.append(body)
+        lines.append("")
+    text = "\n".join(lines).rstrip("\n") + "\n"
+    # PrvText 는 미리보기 용도 — 본문이 아무리 길어도 방어적으로 캡.
+    preview_path.write_text(text[:4000], encoding="utf-8")
 
 
 def update_metadata(content_hpf: Path, title: str) -> None:
@@ -156,7 +157,7 @@ def run() -> Path:
                 item["id"]: item["heading"] for item in (section_items or []) if item.get("id")
             }
             diagram_report = embed_diagrams(working_dir, diagrams, section_headings_by_id=headings_by_id)
-        update_preview(working_dir / "Preview" / "PrvText.txt", title, toc, source_document)
+        update_preview(working_dir / "Preview" / "PrvText.txt", title, toc, source_document, section_items)
         update_metadata(working_dir / "Contents" / "content.hpf", title)
 
         pack_hwpx(working_dir, output)

@@ -305,6 +305,50 @@ def test_diagram_after_section_id_wins_over_legacy_substring(tmp_path: Path):
     assert xml.index('binItemID') > xml.index("베타 섹션")
 
 
+# ── INV-3: 산출물 내부 미리보기(PrvText.txt)가 실제 내용을 반영 ───────────────
+@pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
+def test_prvtext_mirrors_real_content(tmp_path: Path):
+    import json
+    import subprocess
+    import sys as _sys
+
+    sections = [{"heading": "프리뷰 섹션", "body": "PRV_BODY 미리보기 본문."}]
+    sj = tmp_path / "s.json"
+    sj.write_text(json.dumps(sections, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "out.hwpx"
+    r = subprocess.run(
+        [_sys.executable, str(REPO_ROOT / "scripts" / "build_hwpx.py"),
+         "--template", "gonmun", "--output", str(out),
+         "--title", "PRV_TITLE", "--sections-json", str(sj), "--doc-date", "2026.01.01"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    with zipfile.ZipFile(out) as zf:
+        prv = zf.read("Preview/PrvText.txt").decode("utf-8")
+    assert "PRV_TITLE" in prv
+    assert "프리뷰 섹션" in prv
+    assert "PRV_BODY" in prv
+    # 내용과 무관한 고정 보일러플레이트는 사라져야 한다.
+    assert "HWPX 압축 해제" not in prv
+
+
+# ── INV-5: _normalize_paragraph 적용 불가 시 경고를 남긴다 ────────────────────
+def test_normalize_paragraph_warns_when_not_applicable(caplog):
+    import logging as _logging
+
+    p = ET.Element(f"{{{HP}}}p")  # run 이 전혀 없는 문단
+    with caplog.at_level(_logging.WARNING):
+        build_hwpx._normalize_paragraph(p, "내용")
+    assert any("normalize_paragraph" in rec.message for rec in caplog.records)
+
+
+# ── INV-6: 열거 번호("1.")만 남는 조각은 다음 문장에 붙는다 ───────────────────
+def test_split_body_sentences_keeps_enumerators_attached():
+    parts = build_hwpx._split_body_sentences("준비 단계다. 1. 자료 수집. 2. 검토를 진행한다.")
+    assert parts == ["준비 단계다.", "1. 자료 수집.", "2. 검토를 진행한다."]
+
+
 # ── C1 regression guard: table structure survives a build ────────────────────
 # The gonmun template has 2 tables / 6 cells, and its TITLE actually lives inside
 # a table cell. This locks the current behavior so any future "표 셀 치환" work

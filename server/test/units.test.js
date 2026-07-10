@@ -111,7 +111,7 @@ describe('parseSectionsPayload', () => {
 })
 
 // ── docFields resolution (C1: label/value table fill) ───────────────────────
-import { resolveDocFieldValues } from '../../shared/docTypes.js'
+import { buildToc, getDocTypeMeta, resolveDocFieldValues } from '../../shared/docTypes.js'
 
 describe('resolveDocFieldValues', () => {
   it('resolves minutes docFields to [{key,label,value}] using docTypes labels', () => {
@@ -133,6 +133,52 @@ describe('resolveDocFieldValues', () => {
   it('ignores docField keys not declared for the type', () => {
     const out = resolveDocFieldValues('gonmun', { sender: '총무과', bogus: 'x' })
     expect(out).toEqual([{ key: 'sender', label: '발신 기관/부서', value: '총무과' }])
+  })
+})
+
+import { buildDocFieldLines, buildPrompt } from '../services/promptBuilder.js'
+
+describe('promptBuilder', () => {
+  it('assembles declared doc field lines and drops unrelated keys', () => {
+    const meta = getDocTypeMeta('minutes')
+
+    const lines = buildDocFieldLines(meta, {
+      meetingDate: '2026-07-10 14:00',
+      attendees: '김대표, 이과장',
+      ignored: 'x'
+    })
+
+    expect(lines).toBe('회의 일시: 2026-07-10 14:00\n참석자: 김대표, 이과장')
+  })
+
+  it('preserves uploaded-template prompt bytes for a representative minutes input', () => {
+    const meta = getDocTypeMeta('minutes')
+    const docFieldLines = buildDocFieldLines(meta, {
+      meetingDate: '2026-07-10 14:00',
+      attendees: '김대표, 이과장',
+      ignored: 'x'
+    })
+
+    const prompt = buildPrompt({
+      effectiveText: '원문 첫 줄\n원문 둘째 줄',
+      hasUploadedTemplate: true,
+      title: '7월 운영 회의록',
+      docLabel: '회의록',
+      companyName: '테스트컴퍼니',
+      goal: '후속 액션 정리',
+      notes: '표 형식은 유지',
+      fallbackToc: buildToc('minutes'),
+      templateBodySlots: 6,
+      guidance: meta.guidance,
+      docFieldLines
+    })
+
+    expect(prompt).toContain('아래는 사용자가 업로드한 원본 템플릿 문서에서 추출한 텍스트입니다:')
+    expect(prompt).toContain('문서 유형 지침: 사실 기록 중심으로 간결하게 작성하세요. 주요 논의·결정 사항·후속 액션(담당/기한)을 명확히 정리합니다.')
+    expect(prompt).toContain('업로드한 템플릿에는 약 6개의 본문 단락 슬롯이 있습니다.')
+    expect(prompt).toContain('회의 일시: 2026-07-10 14:00\n참석자: 김대표, 이과장')
+    expect(prompt).toHaveLength(1225)
+    expect(Buffer.byteLength(prompt, 'utf8')).toBe(2266)
   })
 })
 

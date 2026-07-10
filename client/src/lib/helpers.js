@@ -37,6 +37,32 @@ export function estimateTemplateSlots(extractedText) {
   return count >= 3 && count <= 20 ? count : 0
 }
 
+// ── Section identity (SPEC-P1b) ──────────────────────────────────────────────
+// 섹션의 안정 id. heading 문자열 대신 이 id 가 섹션의 정체성이 되어, heading 을
+// 리네임해도 다이어그램 바인딩(afterSectionId)과 React key 가 유지된다.
+export function newSectionId() {
+  return globalThis.crypto?.randomUUID?.()
+    ?? `sec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+// 순수 정규화: id 없는 섹션에 id 를 부여하고(기존 id 는 보존 — 재호출해도 안정),
+// 각 다이어그램의 afterSection(heading 문자열)을 첫 일치 섹션의 id 로 해석해
+// afterSectionId 를 채운다. 미일치/기존 id 는 그대로 둔다(서버·python 의 legacy
+// substring 폴백 대상). 적용 지점: 낙관적 draft 생성, 서버 draft 수신, autosave 복구.
+export function withSectionIds(draft) {
+  if (!draft || !Array.isArray(draft.sections)) return draft
+  const sections = draft.sections.map((s) => (s.id ? s : { ...s, id: newSectionId() }))
+  const next = { ...draft, sections }
+  if (Array.isArray(draft.diagrams)) {
+    next.diagrams = draft.diagrams.map((d) => {
+      if (!d || d.afterSectionId || !d.afterSection) return d
+      const target = sections.find((s) => s.heading === d.afterSection)
+      return target ? { ...d, afterSectionId: target.id } : d
+    })
+  }
+  return next
+}
+
 export function buildOptimisticDraft({ sourceInsight, docType, companyName, targetTitle }) {
   const lines = String(sourceInsight.extractedText || '')
     .split('\n')
@@ -56,7 +82,7 @@ export function buildOptimisticDraft({ sourceInsight, docType, companyName, targ
     title: inferredTitle,
     summary: `${companyName} 기준으로 ${labelForDocType(docType)} 초안을 생성하는 중입니다…`,
     toc,
-    sections: toc.map((heading) => ({ heading, body: '' })),
+    sections: toc.map((heading) => ({ id: newSectionId(), heading, body: '' })),
     sourceExcerpt: excerpt,
     engine: 'optimistic-preview'
   }

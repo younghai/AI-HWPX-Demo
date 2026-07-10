@@ -37,7 +37,7 @@ export function EditableDraft({
           <p className="editable-draft-hint">AI가 초안을 작성하는 중입니다. 잠시 후 이 자리에 실제 내용이 채워집니다.</p>
           <ol className="editable-sections" aria-busy="true">
             {sections.map((section, index) => (
-              <li key={index} className="editable-section is-skeleton">
+              <li key={section.id || index} className="editable-section is-skeleton">
                 <div className="editable-section-toolbar">
                   <span className="editable-section-num">{index + 1}</span>
                   <span className="skeleton-heading">{section.heading}</span>
@@ -54,10 +54,15 @@ export function EditableDraft({
       ) : (
       <ol className="editable-sections">
         {sections.map((section, index) => {
-          const diagramSpec = (draft.diagrams || []).find((d) => d.afterSection === section.heading)
+          // id 우선 매칭(heading 폴백) — python 의 배치 규칙(afterSectionId exact,
+          // legacy substring 폴백)과 대칭이어야 heading 리네임 후에도
+          // 미리보기 == 다운로드가 유지된다 (SPEC-P1b).
+          const diagramSpec = (draft.diagrams || []).find((d) =>
+            d.afterSectionId ? d.afterSectionId === section.id : d.afterSection === section.heading
+          )
           const diagramSvg = diagramSpec ? renderDiagramSvg(diagramSpec) : null
           return (
-            <li key={index} className="editable-section">
+            <li key={section.id || index} className="editable-section">
               <div className="editable-section-toolbar">
                 <span className="editable-section-num">{index + 1}</span>
                 <input

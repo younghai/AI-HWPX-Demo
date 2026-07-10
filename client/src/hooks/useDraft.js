@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { buildOptimisticDraft, triggerDownload, estimateTemplateSlots } from '../lib/helpers.js'
+import { buildOptimisticDraft, triggerDownload, estimateTemplateSlots, withSectionIds, newSectionId } from '../lib/helpers.js'
 import { renderDiagramSvg } from '../lib/diagrams.js'
 import { svgToPngBlob } from '../lib/rasterize.js'
 
@@ -101,7 +101,8 @@ export function useDraft({ setParseStatus }) {
 
   function recoverDraft() {
     if (recoverable?.draft) {
-      setDraft(recoverable.draft)
+      // 구버전 autosave 에는 섹션 id 가 없을 수 있다 — 복구 시 정규화(SPEC-P1b).
+      setDraft(withSectionIds(recoverable.draft))
       setParseStatus('이전에 작업하던 초안을 복구했습니다. 원본 파일을 다시 업로드하면 이 초안으로 HWPX를 생성할 수 있습니다.')
     }
     setRecoverable(null)
@@ -166,9 +167,13 @@ export function useDraft({ setParseStatus }) {
         nextDraft = payload.draft
       }
 
-      setDraft(nextDraft)
+      // 수신 시 1회 정규화(SPEC-P1b): 섹션에 안정 id 부여 + 다이어그램의
+      // afterSection(heading)을 afterSectionId 로 해석 — 이후 heading 을
+      // 리네임해도 다이어그램 바인딩이 유지된다(미리보기·빌드 모두 id 기준).
+      const normalized = withSectionIds(nextDraft)
+      setDraft(normalized)
       setParseStatus('업로드 문서를 바탕으로 새 문서 초안이 생성되었고, 오른쪽 미리보기에 바로 반영되었습니다.')
-      return nextDraft
+      return normalized
     } catch (error) {
       if (error.name === 'AbortError') return null
       setDraft(null)
@@ -290,7 +295,7 @@ export function useDraft({ setParseStatus }) {
     patchDraft((d) => {
       const sections = [...d.sections]
       const at = typeof afterIndex === 'number' ? afterIndex + 1 : sections.length
-      sections.splice(at, 0, { heading: '새 섹션', body: '' })
+      sections.splice(at, 0, { id: newSectionId(), heading: '새 섹션', body: '' })
       return { ...d, sections, toc: sections.map((s) => s.heading) }
     })
   }

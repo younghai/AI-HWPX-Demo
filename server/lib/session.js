@@ -1,31 +1,17 @@
 import crypto from 'crypto'
+import { createTtlStore } from './ttlStore.js'
 
-const sessions = new Map()
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000
-
-setInterval(() => {
-  const now = Date.now()
-  for (const [sid, data] of sessions) {
-    if (now - data.createdAt > SESSION_TTL_MS) {
-      sessions.delete(sid)
-    }
-  }
-}, 60 * 1000).unref()
+const sessions = createTtlStore(SESSION_TTL_MS)
 
 export function createSession(user) {
   const sid = crypto.randomBytes(32).toString('hex')
-  sessions.set(sid, { user, createdAt: Date.now() })
+  sessions.set(sid, user)
   return sid
 }
 
 export function getSession(sid) {
-  if (!sid || !sessions.has(sid)) return null
-  const data = sessions.get(sid)
-  if (Date.now() - data.createdAt > SESSION_TTL_MS) {
-    sessions.delete(sid)
-    return null
-  }
-  return data.user
+  return sid ? sessions.get(sid) : null
 }
 
 export function destroySession(sid) {

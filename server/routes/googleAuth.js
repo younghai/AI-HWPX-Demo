@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { createSession, getSession, destroySession } from '../lib/session.js'
-import { escapeXml } from '../../shared/escape.js'
+import { createTtlStore } from '../lib/ttlStore.js'
+import { popupResultPage } from '../lib/popupPage.js'
 import { CLIENT_ORIGIN, OAUTH_REDIRECT_BASE, IS_PRODUCTION, SESSION_COOKIE } from '../lib/config.js'
 import { logger } from '../lib/logger.js'
 
@@ -42,36 +43,19 @@ function cookieOptions(extra = {}) {
   }
 }
 
-const googleStates = new Map()
 const STATE_TTL_MS = 10 * 60 * 1000
-
-setInterval(() => {
-  const now = Date.now()
-  for (const [state, info] of googleStates) {
-    if (now - info.createdAt > STATE_TTL_MS) {
-      googleStates.delete(state)
-    }
-  }
-}, 60 * 1000).unref()
+const googleStates = createTtlStore(STATE_TTL_MS)
 
 function resultPage(success, message) {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Google 로그인</title>
-<style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f6f1e7}
-.card{background:#fff;border-radius:24px;padding:40px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.1);max-width:400px}
-.icon{font-size:48px;margin-bottom:16px}
-h2{margin:0 0 12px;color:#161616}
-p{color:#74716a;margin:0 0 20px}
-button{padding:12px 24px;border:none;border-radius:999px;background:#161616;color:#fff;font-weight:700;cursor:pointer;font-size:1rem}
-</style></head><body>
-<div class="card">
-<div class="icon">${success ? '&#10003;' : '&#10007;'}</div>
-<h2>${success ? '로그인 완료' : '로그인 실패'}</h2>
-<p>${escapeXml(message)}</p>
-<button onclick="window.opener?.postMessage({type:'google-auth-result',success:${success}},'${CLIENT_ORIGIN}');window.close()">닫기</button>
-</div>
-<script>window.opener?.postMessage({type:'google-auth-result',success:${success}},'${CLIENT_ORIGIN}')</script>
-</body></html>`
+  return popupResultPage({
+    title: 'Google 로그인',
+    successHeading: '로그인 완료',
+    failHeading: '로그인 실패',
+    success,
+    message,
+    postMessageType: 'google-auth-result',
+    origin: CLIENT_ORIGIN
+  })
 }
 
 function mockLoginPage() {
@@ -114,7 +98,7 @@ router.get('/auth/google', (_req, res) => {
     return res.status(200).send(mockLoginPage())
   }
   const state = crypto.randomBytes(16).toString('hex')
-  googleStates.set(state, { createdAt: Date.now() })
+  googleStates.set(state, true)
 
   const redirectUri = `${OAUTH_REDIRECT_BASE}/auth/google/callback`
   const params = new URLSearchParams({
@@ -132,10 +116,9 @@ router.get('/auth/google/callback', async (req, res) => {
   if (error) {
     return res.send(resultPage(false, `인증 거부: ${error}`))
   }
-  if (!state || !googleStates.has(state)) {
+  if (!state || !googleStates.take(state)) {
     return res.send(resultPage(false, '잘못된 인증 요청이거나 세션이 만료되었습니다.'))
   }
-  googleStates.delete(state)
 
   const redirectUri = `${OAUTH_REDIRECT_BASE}/auth/google/callback`
   try {

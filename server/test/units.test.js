@@ -455,6 +455,22 @@ describe('tokenOwnerKey', () => {
   })
 })
 
+// ── createTtlStore (P3-c: 3벌 복붙 TTL 스토어의 단일 구현) ───────────────────
+import { createTtlStore } from '../lib/ttlStore.js'
+
+describe('createTtlStore', () => {
+  it('stores, take() consumes one-shot values, and get() expires by ttl', async () => {
+    const store = createTtlStore(50)
+    store.set('k', 'v')
+    expect(store.get('k')).toBe('v')
+    expect(store.take('k')).toBe('v')
+    expect(store.get('k')).toBeNull()
+    store.set('e', 'x')
+    await new Promise((r) => setTimeout(r, 70))
+    expect(store.get('e')).toBeNull()
+  })
+})
+
 // ── runProcess 옵션 (P3-b: spawn 단일화) ─────────────────────────────────────
 import { runProcess } from '../lib/utils.js'
 

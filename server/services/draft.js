@@ -24,18 +24,31 @@ function callProviderOnce({ providerKey, provider, apiKey, model }, prompt, { sy
     : callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model, jsonMode })
 }
 
+// 요청 입력 강제변환의 단일 지점 (SPEC-P3-e). 세 생성 함수가 각자 흩뿌리던
+// String(input.x || …).trim() 묶음의 단일 출처 — 필드를 추가하면 여기 한 곳만
+// 고친다. 시맨틱은 기존과 동일: falsy 일 때만 fallback, 이후 trim.
+function normalizeDraftInput(input) {
+  const s = (value, fallback = '') => String(value || fallback).trim()
+  return {
+    sourceText: s(input.sourceText),
+    docType: s(input.docType, 'report'),
+    companyName: s(input.companyName, '회사명'),
+    goal: s(input.goal),
+    notes: s(input.notes),
+    fileName: s(input.fileName, 'uploaded-document'),
+    targetTitle: s(input.targetTitle),
+    heading: s(input.heading),
+    title: s(input.title, '문서'),
+    providerKey: s(input.aiProvider, 'anthropic'),
+    otherHeadings: Array.isArray(input.otherHeadings) ? input.otherHeadings.filter(Boolean) : []
+  }
+}
+
 export async function buildDraftWithAI(input, { onProgress, userKey = 'local' } = {}) {
   // Optional progress sink for the streaming route (review B2). No-op for the
   // plain JSON endpoint. Kept best-effort — a throwing sink never breaks generation.
   const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
-  const sourceText = String(input.sourceText || '').trim()
-  const docType = String(input.docType || 'report').trim()
-  const companyName = String(input.companyName || '회사명').trim()
-  const goal = String(input.goal || '').trim()
-  const notes = String(input.notes || '').trim()
-  const fileName = String(input.fileName || 'uploaded-document').trim()
-  const targetTitle = String(input.targetTitle || '').trim()
-  const providerKey = String(input.aiProvider || 'anthropic').trim()
+  const { sourceText, docType, companyName, goal, notes, fileName, targetTitle, providerKey } = normalizeDraftInput(input)
 
   const effectiveText = sourceText
     || `제목: ${targetTitle || '문서 초안'}\n목표: ${goal || '일반 문서 작성'}\n메모: ${notes || '없음'}\n회사: ${companyName}`
@@ -160,15 +173,7 @@ export async function buildDraftWithAI(input, { onProgress, userKey = 'local' } 
 // Returns plain body text — no JSON wrapper — so the OpenAI-compatible path is
 // given a plain-text system prompt instead of the JSON-forcing default.
 export async function regenerateSectionWithAI(input, { userKey = 'local' } = {}) {
-  const heading = String(input.heading || '').trim()
-  const title = String(input.title || '문서').trim()
-  const docType = String(input.docType || 'report').trim()
-  const companyName = String(input.companyName || '회사명').trim()
-  const goal = String(input.goal || '').trim()
-  const notes = String(input.notes || '').trim()
-  const sourceText = String(input.sourceText || '').trim()
-  const otherHeadings = Array.isArray(input.otherHeadings) ? input.otherHeadings.filter(Boolean) : []
-  const providerKey = String(input.aiProvider || 'anthropic').trim()
+  const { heading, title, docType, companyName, goal, notes, sourceText, otherHeadings, providerKey } = normalizeDraftInput(input)
 
   if (!heading) throw createHttpError('섹션 제목이 비어 있습니다.', 422)
 
@@ -215,11 +220,7 @@ ${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.j
 // keep this off by default until measured. See B2 for the SSE progress channel.
 export async function buildDraftParallel(input, { onProgress, userKey = 'local' } = {}) {
   const emit = (evt) => { try { onProgress?.(evt) } catch { /* ignore */ } }
-  const docType = String(input.docType || 'report').trim()
-  const companyName = String(input.companyName || '회사명').trim()
-  const fileName = String(input.fileName || 'uploaded-document').trim()
-  const targetTitle = String(input.targetTitle || '').trim()
-  const providerKey = String(input.aiProvider || 'anthropic').trim()
+  const { docType, companyName, fileName, targetTitle, providerKey } = normalizeDraftInput(input)
 
   const provider = AI_PROVIDERS[providerKey]
   if (!provider) throw createHttpError(`지원하지 않는 AI 프로바이더입니다: ${providerKey}`, 400)

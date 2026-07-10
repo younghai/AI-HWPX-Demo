@@ -247,7 +247,36 @@ describe('mockAi', () => {
 })
 
 // ── parallel section generation spike (C2) ───────────────────────────────────
-import { buildDraftParallel } from '../services/draft.js'
+import { buildDraftParallel, buildDraftWithAI } from '../services/draft.js'
+
+describe('buildDraftWithAI', () => {
+  it('generates a mock-provider draft with existing progress and usage shape', async () => {
+    const progress = []
+    const draft = await buildDraftWithAI(
+      {
+        aiProvider: 'mock',
+        docType: 'report',
+        companyName: '테스트',
+        targetTitle: 'T',
+        goal: '자료 정리',
+        notes: '중복 금지',
+        sourceText: '원본 첫 줄\n원본 둘째 줄'
+      },
+      { onProgress: (event) => progress.push(event) }
+    )
+
+    expect(progress.map((event) => event.phase)).toEqual(['prompt', 'calling', 'parsing'])
+    expect(draft.sections).toHaveLength(5)
+    expect(draft.usage).toMatchObject({
+      attempts: 1,
+      provider: '데모 (키 불필요)',
+      model: 'mock',
+      tokensMeasured: false,
+      estCostUsd: 0
+    })
+    expect(draft.engine).toBe('데모 (키 불필요)')
+  })
+})
 
 describe('buildDraftParallel (C2 spike)', () => {
   it('generates one section per TOC entry via the demo provider + emits progress', async () => {

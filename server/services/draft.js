@@ -16,6 +16,12 @@ async function resolveApiKey(provider, providerKey) {
   return oauthToken || process.env[provider.envKey] || ''
 }
 
+function callProviderOnce({ providerKey, provider, apiKey, model }, prompt, { systemPrompt, jsonMode } = {}) {
+  return providerKey === 'anthropic'
+    ? callAnthropic(provider, apiKey, prompt, { systemPrompt, model })
+    : callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model, jsonMode })
+}
+
 export async function buildDraftWithAI(input, { onProgress } = {}) {
   // Optional progress sink for the streaming route (review B2). No-op for the
   // plain JSON endpoint. Kept best-effort — a throwing sink never breaks generation.
@@ -60,6 +66,7 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
   emit({ phase: 'prompt' })
 
   const chosenModel = resolveModel(provider, input.model)
+  const providerCall = { providerKey, provider, apiKey, model: chosenModel.id }
   const callOnce = () => {
     if (provider.demo) {
       // No network — synthesize a placeholder draft that still flows through the
@@ -69,9 +76,7 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
         usage: null
       })
     }
-    return providerKey === 'anthropic'
-      ? callAnthropic(provider, apiKey, prompt, { model: chosenModel.id })
-      : callOpenAICompatible(provider, apiKey, prompt, { model: chosenModel.id, jsonMode: provider.jsonMode })
+    return callProviderOnce(providerCall, prompt, { jsonMode: provider.jsonMode })
   }
 
   let realUsage = null
@@ -196,9 +201,7 @@ ${otherHeadings.length ? `다른 섹션(내용 중복 금지): ${otherHeadings.j
 - 다른 섹션과 내용 중복 금지. 마침표로 끝나는 완결 문장만.`
 
   const chosenModel = resolveModel(provider, input.model)
-  const res = providerKey === 'anthropic'
-    ? await callAnthropic(provider, apiKey, prompt, { systemPrompt, model: chosenModel.id })
-    : await callOpenAICompatible(provider, apiKey, prompt, { systemPrompt, model: chosenModel.id })
+  const res = await callProviderOnce({ providerKey, provider, apiKey, model: chosenModel.id }, prompt, { systemPrompt })
 
   const body = String(res.text || '').trim()
   if (!body) throw createHttpError('AI가 빈 응답을 반환했습니다.', 502)

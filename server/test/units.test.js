@@ -455,6 +455,34 @@ describe('tokenOwnerKey', () => {
   })
 })
 
+// ── runProcess 옵션 (P3-b: spawn 단일화) ─────────────────────────────────────
+import { runProcess } from '../lib/utils.js'
+
+describe('runProcess options (P3-b)', () => {
+  it('kills and fails when output exceeds maxOutputBytes', async () => {
+    const r = await runProcess(
+      process.execPath,
+      ['-e', "process.stdout.write('x'.repeat(200000))"],
+      process.cwd(),
+      { maxOutputBytes: 1000, timeoutMs: 10000 }
+    )
+    expect(r.ok).toBe(false)
+    expect(r.reason).toBe('output limit exceeded')
+    expect(r.stdout.length).toBeLessThanOrEqual(1000)
+  })
+
+  it('exactEnv passes the environment verbatim (no process.env merge)', async () => {
+    const r = await runProcess(
+      process.execPath,
+      ['-e', "console.log((process.env.ONLY || '') + ':' + (process.env.HOME || ''))"],
+      process.cwd(),
+      { exactEnv: { ONLY: '1', PATH: process.env.PATH }, timeoutMs: 10000 }
+    )
+    expect(r.ok).toBe(true)
+    expect(r.stdout).toBe('1:')
+  })
+})
+
 // ── cleanup sweep (BE-09) ────────────────────────────────────────────────────
 import { sweepGenerated } from '../lib/cleanup.js'
 

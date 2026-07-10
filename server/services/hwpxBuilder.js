@@ -8,6 +8,7 @@ import { runProcess, slugify } from '../lib/utils.js'
 import { decodeOriginalName, assertValidUpload } from '../lib/upload.js'
 import { parseSectionsPayload } from '../lib/sections.js'
 import { resolveDocFieldValues } from '../../shared/docTypes.js'
+import { MAX_DIAGRAM_PNG_BYTES } from '../../shared/limits.js'
 import { validateHwpx } from './validator.js'
 import { convertHwpToHwpx, isHwpConverterAvailable } from './hwpConvert.js'
 import { logger } from '../lib/logger.js'
@@ -58,7 +59,6 @@ function parseWorkerError(stdout) {
 }
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47])
-const MAX_DIAGRAM_PNG_BYTES = 2 * 1024 * 1024
 
 // Persist client pre-rendered diagram PNGs to the work dir and attach each one's
 // path to the matching diagram entry in `combined` (review B1). The client names

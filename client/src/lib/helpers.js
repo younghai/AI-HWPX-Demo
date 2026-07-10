@@ -1,6 +1,8 @@
 import { DOC_TYPES, buildToc, deriveTitle, labelForDocType, getDocTypeMeta } from '../../../shared/docTypes.js'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../../shared/limits.js'
 
 export { DOC_TYPES, buildToc, deriveTitle, labelForDocType, getDocTypeMeta }
+export { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB }
 
 export function extractTextFromSvg(svg) {
   const parser = new DOMParser()

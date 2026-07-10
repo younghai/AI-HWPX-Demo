@@ -3,8 +3,8 @@ import multer from 'multer'
 import { buildHwpx } from '../services/hwpxBuilder.js'
 import { sendError } from '../lib/errors.js'
 import { requireSession } from '../lib/authGuard.js'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../shared/limits.js'
 
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } })
 const router = Router()
 
@@ -21,7 +21,7 @@ function uploadExportFiles(req, res, next) {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
         ok: false,
-        error: `파일이 너무 큽니다. 최대 ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB까지 업로드할 수 있습니다.`
+        error: `파일이 너무 큽니다. 최대 ${MAX_UPLOAD_MB}MB까지 업로드할 수 있습니다.`
       })
     }
     return res.status(400).json({ ok: false, error: '파일 업로드에 실패했습니다.' })

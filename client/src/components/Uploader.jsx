@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../lib/helpers.js'
 
 const ACCEPTED_EXTENSIONS = ['.hwp', '.hwpx']
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 function isAcceptedFile(file) {
   if (!file) return false
@@ -31,7 +31,7 @@ export function Uploader({ onFileSelect, currentFile, currentInsight }) {
     }
     if (file.size > MAX_UPLOAD_BYTES) {
       const mb = (file.size / (1024 * 1024)).toFixed(1)
-      setRejectMessage(`파일이 너무 큽니다 (${mb}MB). 최대 20MB까지 업로드할 수 있습니다.`)
+      setRejectMessage(`파일이 너무 큽니다 (${mb}MB). 최대 ${MAX_UPLOAD_MB}MB까지 업로드할 수 있습니다.`)
       return
     }
     onFileSelect(file)
@@ -126,7 +126,7 @@ export function Uploader({ onFileSelect, currentFile, currentInsight }) {
           <p className="uploader-title">
             {isDragging ? '여기에 놓아 업로드' : 'HWP / HWPX 파일을 여기에 끌어다 놓거나 클릭'}
           </p>
-          <p className="uploader-sub">지원 형식: .hwp, .hwpx · 최대 20 MB</p>
+          <p className="uploader-sub">지원 형식: .hwp, .hwpx · 최대 {MAX_UPLOAD_MB} MB</p>
         </div>
       )}
 

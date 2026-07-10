@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import initRhwp, { HwpDocument } from '@rhwp/core'
 import { extractTextFromSvg } from '../lib/helpers.js'
 import { buildPdfFromSvgs } from '../lib/pdf.js'
+import { MAX_SOURCE_TEXT_CHARS, pickSourceText, fetchServerExtract } from '../lib/extractText.js'
 
 // Hard cap on PDF pages so a pathological doc can't hang the browser (review C3).
 const MAX_PDF_PAGES = 100
@@ -9,8 +10,9 @@ const MAX_PDF_PAGES = 100
 const BUILT_INITIAL = { svgs: [], pageCount: 0, fileName: '', url: '' }
 
 // Full-document context extraction bounds (review PO-02).
+// 문자 예산은 서버 MD 채택(HC-2)과 공유 — lib/extractText.js 가 정본.
 const MAX_CONTEXT_PAGES = 50
-const MAX_CONTEXT_CHARS = 12000
+const MAX_CONTEXT_CHARS = MAX_SOURCE_TEXT_CHARS
 
 export function useRhwp() {
   const docRef = useRef(null)
@@ -49,7 +51,7 @@ export function useRhwp() {
     return initPromiseRef.current
   }
 
-  async function parseFile(file) {
+  async function parseFile(file, { serverExtract = false } = {}) {
     if (!file) return null
     setParseStatus('문서를 로컬 브라우저에서 파싱하는 중입니다...')
     parseJobRef.current += 1
@@ -72,6 +74,7 @@ export function useRhwp() {
         pageCount: totalPages,
         previewSvg,
         extractedText: firstPageText,
+        extractEngine: 'rhwp',
         mode: isHwpx ? 'hwpx-template' : 'hwp-source'
       }
       setSourceInsight(insight)
@@ -81,12 +84,28 @@ export function useRhwp() {
       )
 
       void enrichAdditionalPages({ document, totalPages, initialText: firstPageText, jobId })
+      if (serverExtract) void adoptServerExtract({ file, jobId })
       return insight
     } catch (error) {
       console.error('[useRhwp] parseFile failed:', error)
       setParseStatus(`문서 분석에 실패했습니다: ${error.message}`)
       return null
     }
+  }
+
+  // HC-2: 변환기가 있는 서버에서 표 구조 보존 MD 를 받아 프롬프트 원문을 교체.
+  // 미리보기에는 관여하지 않는다. 실패/빈 결과는 완전 no-op (flat 유지).
+  async function adoptServerExtract({ file, jobId }) {
+    const result = await fetchServerExtract(file)
+    if (parseJobRef.current !== jobId) return // 그 사이 다른 파일 선택됨
+    const picked = pickSourceText(null, result)
+    if (picked.engine !== 'hwpconverter') return
+    setSourceInsight((current) => ({
+      ...current,
+      extractedText: picked.text,
+      extractEngine: 'hwpconverter'
+    }))
+    setParseStatus((prev) => prev.includes('표 구조 보존') ? prev : `${prev} · 표 구조 보존 추출 적용`)
   }
 
   async function enrichAdditionalPages({ document, totalPages, initialText, jobId }) {
@@ -106,10 +125,14 @@ export function useRhwp() {
       if (i % 5 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
     }
     if (parseJobRef.current !== jobId) return
-    setSourceInsight((current) => ({
-      ...current,
-      extractedText: pages.join('\n').trim().slice(0, MAX_CONTEXT_CHARS)
-    }))
+    setSourceInsight((current) => {
+      // 서버 MD(표 보존)가 이미 채택됐으면 flat 전체본으로 덮어쓰지 않는다 (HC-2).
+      if (current.extractEngine === 'hwpconverter') return current
+      return {
+        ...current,
+        extractedText: pages.join('\n').trim().slice(0, MAX_CONTEXT_CHARS)
+      }
+    })
   }
 
   async function renderBuiltHwpx(url, fileName) {

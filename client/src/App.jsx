@@ -51,6 +51,7 @@ export default function App() {
   const usingDemo = !providersInfo.hasConfigured && providersInfo.hasDemo
   const effectiveProvider = usingDemo ? 'mock' : providersInfo.aiProvider
   const effectiveModel = usingDemo ? 'mock' : providersInfo.aiModel
+  const hwpConvertAvailable = Boolean(providersInfo.capabilities?.hwpConvert)
   const rhwp = useRhwp()
   const draftApi = useDraft({ setParseStatus: rhwp.setParseStatus })
   const flow = useDocumentFlow({
@@ -59,7 +60,7 @@ export default function App() {
     toast,
     providersInfo: {
       hasConfigured: providersInfo.hasConfigured, hasDemo: providersInfo.hasDemo, usingDemo,
-      effectiveProvider, effectiveModel, openSettings: () => setShowSettings(true)
+      effectiveProvider, effectiveModel, hwpConvertAvailable, openSettings: () => setShowSettings(true)
     },
     previewPanelRef,
     form: {
@@ -103,7 +104,7 @@ export default function App() {
           goal={goal} setGoal={setGoal}
           notes={notes} setNotes={setNotes}
           activeModels={providersInfo.activeModels} aiModel={providersInfo.aiModel} setAiModel={providersInfo.setAiModel}
-          hwpConvertAvailable={Boolean(providersInfo.capabilities?.hwpConvert)}
+          hwpConvertAvailable={hwpConvertAvailable}
           onGenerate={flow.handleGenerate}
           onDownload={flow.handleDownload}
           onDownloadPdf={flow.handleDownloadPdf}

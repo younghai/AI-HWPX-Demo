@@ -51,7 +51,8 @@ export function useDocumentFlow({ rhwp, draftApi, toast, providersInfo, previewP
     form.setSourceFile(file)
     draftApi.setDraft(null)
     rhwp.clearBuiltPreview()
-    await rhwp.parseFile(file)
+    // HC-2: 변환기 가용 시 서버 MD 추출로 표 구조 보존 원문을 채택 (실패=flat 폴백)
+    await rhwp.parseFile(file, { serverExtract: Boolean(providersInfo.hwpConvertAvailable) })
     if (!form.targetTitle) {
       form.setTargetTitle(file.name.replace(/\.(hwp|hwpx)$/i, ''))
     }

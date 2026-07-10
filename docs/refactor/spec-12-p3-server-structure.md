@@ -24,7 +24,17 @@
 
 **설계:** ① `lib/ttlStore.js` `createTtlStore(ttlMs)` — `set/get/take/delete`, get이 만료 검사(스윕은 메모리 회수용). 세 저장소를 전환(공개 API·의미 불변: `consumeState`=take, `getSession` null 계약 유지). ② `lib/popupPage.js` `popupResultPage({title, successHeading, failHeading, success, message, postMessageType, origin})` — 기존 두 페이지와 마크업 동일(escapeXml 경유, /auth 완화 CSP 하 동작). `mockLoginPage`는 구조가 다른 폼 페이지라 **범위 외**(공용 CSS 추출은 ROI 낮음).
 
-## 잔여(후속 턴): A-rec 1(index.js 라우터-only 축소), A-rec 4(라우트 경계 DTO), A-rec 7(buildDraftParallel 거취 — usage shape 정규화 또는 제거 결정).
+## P3-d — index.js 라우터-only 축소 [A-rec 1] ✅
+
+부트스트랩(124줄)을 60줄로: 로깅·CSP·완화 CSP·rate-limit → `lib/httpMiddleware.js`(+`COST_LIMITED_PATHS`), `/api/metrics` → `routes/metrics.js`, SPA 서빙 → `lib/spa.js`(`repoRoot` 재사용으로 자체 `__dirname` 제거). index.js는 장착 순서만 소유 — 헌장 복원.
+
+## P3-e — draft 입력 강제변환 단일화 [A-rec 4] ✅
+
+세 생성 함수의 `String(input.x || …).trim()` 22줄을 `normalizeDraftInput` 단일 지점으로(시맨틱 동일). **라우트-경계 DTO 변형은 비채택:** 라우트가 `req.body`를 그대로 서비스에 넘기는 현 구조에서 서비스 진입점 정규화와 방어 커버리지가 동일하고, 서비스 직접 호출(테스트 포함)도 같은 규칙을 타는 장점이 있다.
+
+## A-rec 7 — buildDraftParallel 거취 [처분 기록, 코드 무변경]
+
+**권고: 제거.** 근거 — ① 자기 문서로 "strictly lower quality" 실험 스파이크, ② client 가 `parallel:true` 를 보내는 경로가 없어 실사용 0(API 전용 잠재 경로), ③ usage shape 가 본 경로와 상이(감사 A §4). 다만 **기능 삭제는 제품 결정**이므로 코드는 유지하고 결정을 여기 남긴다. 제거 시: `services/draft.js` 의 함수 + `routes/draft.js` 의 `parallel` 분기 + units 테스트 1개.
 
 ## 검증 (공통)
 - server 스위트 GREEN(+ P3-b: 출력 캡·exactEnv 단위 테스트, P3-c: ttlStore 단위 테스트 신규).

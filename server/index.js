@@ -34,10 +34,31 @@ app.use(pinoHttp({
   genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
   autoLogging: { ignore: (req) => req.url === '/api/health' }
 }))
-// helmet security headers. CSP is disabled because the OAuth result pages rely
-// on inline scripts; the other protections (HSTS, noSniff, frameguard, …) apply.
-// A tailored CSP is a follow-up refinement.
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
+// helmet security headers + CSP (spec-11). SPA/API 는 엄격 정책:
+// - script-src 'wasm-unsafe-eval' — @rhwp/core 의 WebAssembly.instantiate 에 필요
+// - img-src blob:/data: — 다이어그램 캔버스 래스터화·미리보기 이미지
+// - upgrade-insecure-requests 해제 — 로컬은 http 직결(배포는 nginx 가 TLS 종단)
+// OAuth 결과 페이지의 인라인 스크립트는 아래 /auth 전용 완화 정책이 덮어쓴다
+// (이전에는 이 페이지들 때문에 CSP 전체가 꺼져 있었다).
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'script-src': ["'self'", "'wasm-unsafe-eval'"],
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'connect-src': ["'self'"],
+      'upgrade-insecure-requests': null
+    }
+  },
+  crossOriginResourcePolicy: false
+}))
+// OAuth 팝업 결과·모의 로그인 페이지는 인라인 <script>/onclick/<style> 을 쓰는
+// 서버 생성 HTML(메시지는 escapeXml 경유) — 이 경로만 완화 정책으로 덮어쓴다.
+const OAUTH_PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+app.use('/auth', (_req, res, next) => {
+  res.set('Content-Security-Policy', OAUTH_PAGE_CSP)
+  next()
+})
 app.use(cors({ origin: CLIENT_ORIGIN, methods: ['GET', 'POST'], credentials: true }))
 app.use(cookieParser())
 app.use(express.json({ limit: '3mb' }))

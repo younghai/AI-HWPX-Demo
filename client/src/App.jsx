@@ -15,6 +15,7 @@ import { useRhwp } from './hooks/useRhwp.js'
 import { useDraft } from './hooks/useDraft.js'
 import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
+import { diagramReportFeedback, usageMessage, validationFeedback } from './lib/feedback.js'
 
 export default function App() {
   const previewPanelRef = useRef(null)
@@ -78,13 +79,6 @@ export default function App() {
   // Shared context for section-level regenerate + build (review PO-01).
   function draftContext() {
     return { docType, companyName, goal, notes, docFields, sourceText: sourceInsight.extractedText, aiProvider: effectiveProvider, model: effectiveModel }
-  }
-
-  function usageMessage(usage) {
-    if (!usage) return ''
-    const prefix = usage.tokensMeasured ? '' : '추정 '
-    const cost = usage.estCostUsd > 0 ? ` · ${prefix}비용 $${usage.estCostUsd.toFixed(4)}` : ''
-    return `AI 응답 ${(usage.elapsedMs / 1000).toFixed(1)}초${cost}`
   }
 
   function handleCancel() {
@@ -173,27 +167,16 @@ export default function App() {
         ? '미리보기와 다운로드 파일이 동일한 HWPX로 생성되었습니다.'
         : 'HWPX 파일이 생성되었습니다. 다운로드 버튼으로 받을 수 있습니다.')
       setStage('done')
-      // Diagram embed visibility (review D2): tell the user how many diagrams
-      // actually made it into the file — a partial/zero embed is no longer silent.
-      const dr = built.diagramReport
-      if (dr && dr.requestedCount > 0) {
-        if (dr.embeddedCount === dr.requestedCount) {
-          info(`다이어그램 ${dr.embeddedCount}/${dr.requestedCount}개가 문서에 반영되었습니다.`)
-        } else if (dr.embeddedCount === 0) {
-          errorToast(`다이어그램 ${dr.requestedCount}개가 문서에 반영되지 못했습니다. 미리보기를 다시 생성하거나 브라우저를 새로고침해 보세요.`)
-        } else {
-          errorToast(`다이어그램 ${dr.embeddedCount}/${dr.requestedCount}개만 반영되었습니다. 일부 다이어그램이 누락됐습니다.`)
-        }
+      const diagramFeedback = diagramReportFeedback(built.diagramReport)
+      if (diagramFeedback) {
+        if (diagramFeedback.kind === 'info') info(diagramFeedback.text)
+        else errorToast(diagramFeedback.text)
       }
-      const v = built.validation
-      if (v) {
-        if (!v.ok) {
-          errorToast(`HWPX 검증: 에러 ${v.errorCount}건, 경고 ${v.warningCount}건. 우측 검증 패널을 확인하세요.`)
-        } else if (v.warningCount > 0) {
-          info(`HWPX 검증: 경고 ${v.warningCount}건. 큰 문제는 없습니다.`)
-        } else {
-          success('HWPX 검증 통과! 다운로드할 수 있습니다.')
-        }
+      const validation = validationFeedback(built.validation)
+      if (validation) {
+        if (validation.kind === 'success') success(validation.text)
+        else if (validation.kind === 'info') info(validation.text)
+        else errorToast(validation.text)
       }
     } else {
       setEditing(true)

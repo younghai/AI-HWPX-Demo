@@ -14,6 +14,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { runProcess } from '../lib/utils.js'
+import { POLARIS_DVC_CLI } from '../lib/config.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -22,11 +23,12 @@ const defaultBin = path.join(v3Root, 'tools', 'bin', 'polaris-dvc')
 const fallbackSpec = path.join(v3Root, 'tools', 'polaris-dvc-spec.json')
 const specsDir = path.join(v3Root, 'specs')
 
-const binPath = process.env.POLARIS_DVC_CLI || defaultBin
+const binPath = POLARIS_DVC_CLI || defaultBin
 
 // docType → spec 파일 해상도. docType 별 override 환경변수도 지원.
 async function resolveSpecPath(docType) {
   const envKey = docType ? `VALIDATION_SPEC_${docType.toUpperCase()}` : null
+  // dynamic read on purpose
   const envOverride = envKey ? process.env[envKey] : null
   const candidates = []
   if (envOverride) candidates.push(envOverride)

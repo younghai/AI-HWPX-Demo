@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { spawn, spawnSync } from 'child_process'
 import { logger } from '../lib/logger.js'
+import { JAVA_BIN } from '../lib/config.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -12,7 +13,6 @@ const repoRoot = path.resolve(__dirname, '..', '..')
 const vendorDir = path.join(repoRoot, 'vendor', 'hwpconverter')
 const converterJar = path.join(vendorDir, 'hwpConverter.jar')
 const converterLibGlob = path.join(vendorDir, 'lib', '*')
-const javaBin = process.env.JAVA_BIN || 'java'
 const CONVERTER_CLASS = 'kr.n.nframe.newfeature.HwpConverterCli'
 const STDERR_SNIPPET_BYTES = 1200
 const MAX_OUTPUT_CHARS = 64 * 1024
@@ -24,7 +24,7 @@ function probeAvailability() {
   if (!existsSync(converterJar)) {
     return { available: false, reason: 'hwpConverter.jar not found' }
   }
-  const javaProbe = spawnSync(javaBin, ['-version'], { encoding: 'utf8', timeout: 5000 })
+  const javaProbe = spawnSync(JAVA_BIN, ['-version'], { encoding: 'utf8', timeout: 5000 })
   if (javaProbe.error) {
     return { available: false, reason: `java unavailable: ${javaProbe.error.message}` }
   }
@@ -41,9 +41,9 @@ function logAvailabilityOnce() {
   if (availabilityLogged) return
   availabilityLogged = true
   if (availability.available) {
-    logger.info({ javaBin, converterJar }, 'hwp converter available')
+    logger.info({ javaBin: JAVA_BIN, converterJar }, 'hwp converter available')
   } else {
-    logger.warn({ javaBin, converterJar, reason: availability.reason }, 'hwp converter unavailable')
+    logger.warn({ javaBin: JAVA_BIN, converterJar, reason: availability.reason }, 'hwp converter unavailable')
   }
 }
 
@@ -72,7 +72,7 @@ function runConverter(args) {
   return new Promise((resolve) => {
     let child
     try {
-      child = spawn(javaBin, args, { cwd: repoRoot, env: converterEnv() })
+      child = spawn(JAVA_BIN, args, { cwd: repoRoot, env: converterEnv() })
     } catch (err) {
       return resolve({ ok: false, stdout: '', stderr: '', reason: `spawn failed: ${err.message}` })
     }

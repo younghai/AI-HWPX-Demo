@@ -1,9 +1,8 @@
 import path from 'path'
 import fs from 'fs/promises'
 import { logger } from './logger.js'
+import { GENERATED_MAX_BYTES, GENERATED_TTL_MS } from './config.js'
 
-const TTL_MS = Number(process.env.GENERATED_TTL_MS) || 24 * 60 * 60 * 1000  // 24h
-const MAX_TOTAL_BYTES = Number(process.env.GENERATED_MAX_BYTES) || 500 * 1024 * 1024  // 500MB
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000  // hourly
 
 // Prune the generated/ directory so a long-running deployment doesn't grow the
@@ -29,7 +28,7 @@ export async function sweepGenerated(dir, { now }) {
   let removed = 0
   const survivors = []
   for (const entry of entries) {
-    if (now - entry.mtimeMs > TTL_MS) {
+    if (now - entry.mtimeMs > GENERATED_TTL_MS) {
       await fs.unlink(path.join(dir, entry.name)).catch(() => {})
       removed += 1
     } else {
@@ -39,10 +38,10 @@ export async function sweepGenerated(dir, { now }) {
 
   // Size cap: delete oldest survivors until under the cap.
   let total = survivors.reduce((sum, e) => sum + e.size, 0)
-  if (total > MAX_TOTAL_BYTES) {
+  if (total > GENERATED_MAX_BYTES) {
     survivors.sort((a, b) => a.mtimeMs - b.mtimeMs)
     for (const entry of survivors) {
-      if (total <= MAX_TOTAL_BYTES) break
+      if (total <= GENERATED_MAX_BYTES) break
       await fs.unlink(path.join(dir, entry.name)).catch(() => {})
       total -= entry.size
       removed += 1

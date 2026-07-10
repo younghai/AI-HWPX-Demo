@@ -1,15 +1,14 @@
 import { spawn } from 'child_process'
-import os from 'os'
+import { MAX_WORKER_SPAWNS } from './config.js'
 
 // Bound concurrent worker spawns so a burst of exports can't fork-bomb the box
 // (each export spawns build_hwpx + validators). Default = cores-2, min 2, and
 // overridable via MAX_WORKER_SPAWNS. See review BE-19.
-const MAX_SPAWNS = Number(process.env.MAX_WORKER_SPAWNS) || Math.max(2, (os.cpus()?.length || 4) - 2)
 let activeSpawns = 0
 const spawnQueue = []
 
 function acquireSpawnSlot() {
-  if (activeSpawns < MAX_SPAWNS) {
+  if (activeSpawns < MAX_WORKER_SPAWNS) {
     activeSpawns += 1
     return Promise.resolve()
   }

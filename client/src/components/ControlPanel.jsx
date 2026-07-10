@@ -15,12 +15,15 @@ export function ControlPanel({
   goal, setGoal,
   notes, setNotes,
   activeModels = [], aiModel, setAiModel,
+  hwpConvertAvailable = false,
   onGenerate, onDownload,
   onDownloadPdf, canDownloadPdf, pdfBusy,
   draftLoading, exportState, hasDraft, usingDemo,
   parseStatus
 }) {
   const hasFile = Boolean(sourceFile)
+  const isTemplateMode = sourceInsight.mode === 'hwpx-template'
+  const bannerVariant = isTemplateMode || hwpConvertAvailable ? 'template' : 'source'
 
   return (
     <section className="control-column">
@@ -32,14 +35,16 @@ export function ControlPanel({
           currentInsight={sourceInsight}
         />
         {hasFile && sourceInsight.mode ? (
-          <div className={`mode-banner mode-banner--${sourceInsight.mode === 'hwpx-template' ? 'template' : 'source'}`} role="status">
+          <div className={`mode-banner mode-banner--${bannerVariant}`} role="status">
             <span className="mode-banner-icon" aria-hidden="true">
-              {sourceInsight.mode === 'hwpx-template' ? '🧩' : '✍️'}
+              {isTemplateMode ? '🧩' : '✍️'}
             </span>
             <span className="mode-banner-text">
-              {sourceInsight.mode === 'hwpx-template'
+              {isTemplateMode
                 ? <><strong>양식 유지 모드</strong> — 업로드한 HWPX 서식·표·레이아웃을 그대로 두고 본문만 AI로 채웁니다.</>
-                : <><strong>새 양식 생성 모드</strong> — HWP 원본 내용을 분석해 기본 HWPX 양식으로 새 문서를 만듭니다. 원본 서식은 유지되지 않습니다.</>}
+                : hwpConvertAvailable
+                  ? <><strong>HWP 변환 모드</strong> — 업로드한 HWP를 HWPX로 변환해 원본 서식·표·이미지를 유지하고 본문만 AI로 채웁니다.</>
+                  : <><strong>새 양식 생성 모드</strong> — HWP 원본 내용을 분석해 기본 HWPX 양식으로 새 문서를 만듭니다. 원본 서식은 유지되지 않습니다.</>}
             </span>
           </div>
         ) : (

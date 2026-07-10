@@ -3,6 +3,7 @@ import { AI_PROVIDERS, knownEnvKeys } from '../lib/providers-config.js'
 import { writeEnvFile } from '../lib/env.js'
 import { sendError } from '../lib/errors.js'
 import { callAnthropic, callOpenAICompatible } from '../services/ai.js'
+import { isHwpConverterAvailable } from '../services/hwpConvert.js'
 import { requireSession, currentUser, tokenOwnerKey } from '../lib/authGuard.js'
 import { hasOAuthToken } from '../lib/oauthTokens.js'
 
@@ -22,7 +23,7 @@ router.get('/api/providers', (req, res) => {
     configured: val.demo ? true : (Boolean(process.env[val.envKey]) || hasOAuthToken(owner, key)),
     oauthSupported: Boolean(val.oauth && process.env[val.oauth?.clientIdEnv])
   }))
-  res.json({ ok: true, providers: list })
+  res.json({ ok: true, providers: list, capabilities: { hwpConvert: isHwpConverterAvailable() } })
 })
 
 router.post('/api/settings', requireSession, async (req, res) => {

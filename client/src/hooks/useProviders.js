@@ -37,6 +37,7 @@ function persistModel(providerKey, modelId) {
 
 export function useProviders(onError) {
   const [providers, setProviders] = useState([])
+  const [capabilities, setCapabilities] = useState({})
   const [aiProvider, setAiProviderState] = useState(readStoredProvider)
   const [modelMap, setModelMap] = useState(readModelMap)
 
@@ -59,6 +60,7 @@ export function useProviders(onError) {
       const data = await res.json()
       if (data.ok) {
         setProviders(data.providers)
+        setCapabilities(data.capabilities || {})
         // Auto-select a REAL configured provider (skip the always-configured demo
         // — it should only be used via an explicit demo action, never silently).
         const configured = data.providers.find((p) => p.configured && !p.demo)
@@ -99,5 +101,5 @@ export function useProviders(onError) {
     setModelMap((prev) => ({ ...prev, [aiProvider]: modelId }))
   }, [aiProvider])
 
-  return { providers, aiProvider, setAiProvider, refresh, activeProvider, hasConfigured, hasDemo, aiModel, setAiModel, activeModels }
+  return { providers, capabilities, aiProvider, setAiProvider, refresh, activeProvider, hasConfigured, hasDemo, aiModel, setAiModel, activeModels }
 }

@@ -103,6 +103,7 @@ export default function App() {
           goal={goal} setGoal={setGoal}
           notes={notes} setNotes={setNotes}
           activeModels={providersInfo.activeModels} aiModel={providersInfo.aiModel} setAiModel={providersInfo.setAiModel}
+          hwpConvertAvailable={Boolean(providersInfo.capabilities?.hwpConvert)}
           onGenerate={flow.handleGenerate}
           onDownload={flow.handleDownload}
           onDownloadPdf={flow.handleDownloadPdf}

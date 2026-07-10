@@ -1,6 +1,18 @@
 import { createHttpError } from './errors.js'
 
 /**
+ * @typedef {Object} CombinedEntry
+ * @property {string} [heading] Section variant heading, validated by shared/validate.js.
+ * @property {string} [body] Section variant body, validated by shared/validate.js.
+ * @property {string} [type] Diagram variant type, validated by shared/validate.js.
+ * @property {string} [title] Diagram variant title, validated by shared/validate.js.
+ * @property {Array<unknown>} [data] Diagram variant data, validated by shared/validate.js.
+ * @property {string} [afterSection] Diagram placement hint, validated by shared/validate.js.
+ * @property {true} [_diagram] Diagram marker; sections.js sets it on combined request diagrams.
+ * @property {string} [_pngPath] Attached by hwpxBuilder.js; build_hwpx.py consumes it with _diagram.
+ */
+
+/**
  * Parse the export request's sections + diagrams payloads into a single combined
  * array for the Python worker.
  *
@@ -13,7 +25,7 @@ import { createHttpError } from './errors.js'
  * - `rawDiagrams` is always optional: a bad payload degrades to "no diagrams"
  *   rather than failing the whole export.
  *
- * @returns {Array<object>|null} combined [...sections, ...diagrams] or null
+ * @returns {Array<CombinedEntry>|null} combined [...sections, ...diagrams] or null
  */
 export function parseSectionsPayload(rawSections, rawDiagrams, { onDiagramWarning } = {}) {
   if (!rawSections) return null

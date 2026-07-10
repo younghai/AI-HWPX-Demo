@@ -49,6 +49,7 @@ function normalizeDiagram(spec) {
   const title = typeof spec.title === 'string' ? spec.title.trim() : ''
   const afterSection = typeof spec.afterSection === 'string' ? spec.afterSection.trim() : ''
   const data = Array.isArray(spec.data) ? spec.data : []
+  // Combined sections+diagrams magic-key contract is documented in server/lib/sections.js.
   return { _diagram: true, type, title, afterSection, data }
 }
 

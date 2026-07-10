@@ -59,8 +59,8 @@ def test_load_sections_normalizes_nfd_heading(tmp_path: Path):
     )
     sections, _ = build_hwpx.load_sections_body(str(p))
     nfc_heading = unicodedata.normalize("NFC", "서비스 추진 배경")
-    assert nfc_heading in sections
-    assert sections[nfc_heading] == "본문"
+    assert sections[0]["heading"] == nfc_heading
+    assert sections[0]["body"] == "본문"
 
 
 # ── PY-04: malformed sections JSON raises (not silent empty doc) ──────────────
@@ -266,6 +266,43 @@ def test_diagram_png_bytes_rejects_bogus_pngpath(tmp_path: Path):
     # Either cairosvg rendered a real PNG (if installed) or nothing (skip) — never
     # the bogus bytes.
     assert out is None or out[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+# ── SPEC-P1b: afterSectionId(exact)가 legacy afterSection(substring)보다 우선 ──
+@pytest.mark.skipif(not TEMPLATE.exists(), reason="template missing")
+def test_diagram_after_section_id_wins_over_legacy_substring(tmp_path: Path):
+    import json
+    import subprocess
+    import sys as _sys
+
+    png_path = tmp_path / "d.png"
+    _make_png(png_path)
+    payload = [
+        {"id": "s1", "heading": "알파 섹션", "body": "ALPHA_BODY 본문."},
+        {"id": "s2", "heading": "베타 섹션", "body": "BETA_BODY 본문."},
+        {
+            "_diagram": True, "type": "flowchart", "title": "T",
+            # legacy 힌트는 일부러 s1(알파)을, id 는 s2(베타)를 가리키게 충돌시킨다.
+            "afterSection": "알파 섹션", "afterSectionId": "s2",
+            "data": ["a"], "_pngPath": str(png_path),
+        },
+    ]
+    sj = tmp_path / "s.json"
+    sj.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "out.hwpx"
+    r = subprocess.run(
+        [_sys.executable, str(REPO_ROOT / "scripts" / "build_hwpx.py"),
+         "--template", "gonmun", "--output", str(out),
+         "--title", "ID배치", "--sections-json", str(sj), "--doc-date", "2026.01.01"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    with zipfile.ZipFile(out) as zf:
+        xml = zf.read("Contents/section0.xml").decode("utf-8")
+    # id 타깃(베타 섹션 heading) 뒤에 배치 — legacy substring 이 이겼다면
+    # 알파와 베타 사이에 있었을 것이므로, 베타보다 뒤임이 id 승리의 증거다.
+    assert xml.index('binItemID') > xml.index("베타 섹션")
 
 
 # ── C1 regression guard: table structure survives a build ────────────────────

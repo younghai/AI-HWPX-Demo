@@ -127,10 +127,12 @@ def run() -> Path:
     template = TEMPLATES[args.template]
     template_path = Path(args.template_file).expanduser().resolve() if args.template_file else template["path"]
     title = unicodedata.normalize('NFC', args.title or template["default_title"])
-    sections_body, diagrams = load_sections_body(args.sections_json)
+    section_items, diagrams = load_sections_body(args.sections_json)
     doc_fields = load_doc_fields(args.doc_fields)
-    if sections_body:
-        toc = list(sections_body.keys())
+    if section_items:
+        # toc 는 같은 리스트에서 파생 — toc[i] == section_items[i]['heading'] 이
+        # 구조적으로 보장되고, 중복 heading 도 별개 섹션으로 유지된다 (SPEC-P1b).
+        toc = [item["heading"] for item in section_items]
     else:
         toc = [unicodedata.normalize('NFC', item) for item in normalize_toc(args.toc, args.template)]
     source_document = unicodedata.normalize('NFC', args.source_document)
@@ -144,13 +146,16 @@ def run() -> Path:
         working_dir = Path(temp_dir)
         unpack_hwpx(template_path, working_dir)
 
-        apply_smart_replacements(working_dir, title, toc, source_document, sections_body, doc_date=args.doc_date, doc_fields=doc_fields)
+        apply_smart_replacements(working_dir, title, toc, source_document, section_items, doc_date=args.doc_date, doc_fields=doc_fields)
         diagram_report = {
             "requestedCount": 0, "embeddedCount": 0,
             "cairosvgAvailable": False, "embedded": [], "skipped": [],
         }
         if diagrams:
-            diagram_report = embed_diagrams(working_dir, diagrams)
+            headings_by_id = {
+                item["id"]: item["heading"] for item in (section_items or []) if item.get("id")
+            }
+            diagram_report = embed_diagrams(working_dir, diagrams, section_headings_by_id=headings_by_id)
         update_preview(working_dir / "Preview" / "PrvText.txt", title, toc, source_document)
         update_metadata(working_dir / "Contents" / "content.hpf", title)
 

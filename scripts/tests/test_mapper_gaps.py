@@ -167,6 +167,24 @@ def test_no_sections_preserves_cli_toc_fallback(tmp_path: Path):
     assert _heading_texts(output_xml)[0] == "개요"
 
 
+@pytest.mark.skipif(not GONMUN_TEMPLATE.exists(), reason="template missing")
+def test_duplicate_headings_keep_all_sections(tmp_path: Path):
+    """SPEC-P1b: 같은 heading 의 섹션 2개가 하나로 붕괴되지 않는다 (N→N).
+    구현이 dict[heading→body] 였을 때는 뒤 섹션이 앞을 덮어써 본문 하나가
+    조용히 소실됐다 — 순서 보존 list + index 바인딩이 이를 제거한다."""
+    sections = [
+        {"heading": "중복 헤딩", "body": "DUP_ALPHA 고유 본문."},
+        {"heading": "중복 헤딩", "body": "DUP_BETA 고유 본문."},
+    ]
+
+    output = _build_hwpx(tmp_path, sections, None)
+    output_xml = _section_xml(output)
+
+    assert output_xml.count("DUP_ALPHA") == 1
+    assert output_xml.count("DUP_BETA") == 1
+    assert _heading_texts(output_xml)[:2] == ["중복 헤딩", "중복 헤딩"]
+
+
 @pytest.mark.skipif(not SLOTLESS_FIXTURE.exists(), reason="mapper slotless fixture missing")
 def test_body_slotless_heading_inserts_paragraphs(tmp_path: Path):
     toc = ["슬롯리스 첫 섹션", "슬롯리스 둘째 섹션"]

@@ -68,6 +68,7 @@ def _has_valid_client_png(diag_spec: dict) -> bool:
 def embed_diagrams(
     working_dir: Path,
     diagrams: list[dict],
+    section_headings_by_id: dict[str, str] | None = None,
 ) -> dict:
     """Embed each diagram as a PNG into the HWPX document and RETURN a report
     (review D2 — diagram embed visibility).
@@ -77,6 +78,13 @@ def embed_diagrams(
     obtainable PNG is skipped (recorded in report["skipped"]) rather than failing
     the build. The Node caller surfaces "N/M개 반영" from this report so silent
     drops become visible.
+
+    Placement (SPEC-P1b): a diagram carrying `afterSectionId` is anchored by
+    EXACT match against that section's heading text (resolved via
+    section_headings_by_id) — id wins over the legacy `afterSection` substring
+    match, whose "first paragraph CONTAINING the name" heuristic can misplace
+    on short/duplicated headings (review INV-4). Legacy substring remains the
+    fallback for id-less callers.
     """
     report = {
         "requestedCount": len(diagrams),
@@ -149,9 +157,20 @@ def embed_diagrams(
         item_el.set("href", f"BinData/{png_name}")
         item_el.set("media-type", "image/png")
 
-        # Find the insertion point: paragraph after `after_section` heading
+        # Find the insertion point. Prefer the id-resolved heading (exact text
+        # match); fall back to the legacy afterSection substring heuristic.
         insert_after_para = None
-        if after_section:
+        target_id = diag_spec.get("afterSectionId", "")
+        target_heading = (section_headings_by_id or {}).get(target_id, "") if target_id else ""
+        if target_heading:
+            for para in all_paras:
+                for t in para.findall(f".//{{{HP}}}t"):
+                    if (t.text or "").strip() == target_heading:
+                        insert_after_para = para
+                        break
+                if insert_after_para is not None:
+                    break
+        if insert_after_para is None and after_section:
             for para in all_paras:
                 t_nodes = [t for t in para.findall(f".//{{{HP}}}t") if t.text]
                 for t in t_nodes:

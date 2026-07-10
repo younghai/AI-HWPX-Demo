@@ -49,18 +49,18 @@ def detect_heading_style_ids(header_xml: Path) -> frozenset[str]:
 def _insert_sections_after(
     index: ParentIndex,
     anchor_para: ET.Element,
-    toc_names: list[str],
-    sections_body: dict[str, str],
+    pairs: list[tuple[str, str]],
     body_template: ET.Element,
     heading_style_id: str | None,
 ) -> ET.Element:
+    """anchor_para 뒤에 (heading, body) 쌍들을 heading+본문문장 문단으로 삽입."""
     cur = anchor_para
-    for section_name in toc_names:
+    for section_name, body in pairs:
         heading_clone = _clone_paragraph_for_text(body_template, section_name)
         if heading_style_id is not None:
             heading_clone.set("styleIDRef", heading_style_id)
         cur = index.insert_after(cur, heading_clone)
-        for sentence in _split_body_sentences(sections_body.get(section_name, "")):
+        for sentence in _split_body_sentences(body):
             cur = index.insert_after(cur, _clone_paragraph_for_text(body_template, sentence))
     return cur
 
@@ -70,13 +70,18 @@ def apply_smart_replacements(
     title: str,
     toc: list[str],
     source_document: str,
-    sections_body: dict[str, str] | None = None,
+    section_items: list[dict] | None = None,
     doc_date: str | None = None,
     doc_fields: list[dict] | None = None,
 ) -> None:
     """Two-pass replacement that maps AI-generated content to template
-    sections by INDEX (not name lookup), then normalizes each paragraph
-    to remove stale runs/positioning that cause visual overlap."""
+    sections by INDEX, then normalizes each paragraph to remove stale
+    runs/positioning that cause visual overlap.
+
+    section_items is the order-preserving [{heading, body[, id]}] list from
+    hwpx.io.load_sections_body; the caller derives toc from the same list, so
+    toc[i] and section_items[i] describe the same section by construction —
+    duplicate headings therefore stay distinct sections (SPEC-P1b)."""
     header_path = working_dir / "Contents" / "header.xml"
     section_path = working_dir / "Contents" / "section0.xml"
 
@@ -144,7 +149,10 @@ def apply_smart_replacements(
     if meta_para is not None:
         _normalize_paragraph(meta_para, f"<원본문서 : {source_document}, {now_label}>")
 
-    sections_body = sections_body or {}
+    items = section_items or []
+
+    def _body_at(k: int) -> str:
+        return items[k]["body"] if k < len(items) else ""
 
     if not sections and toc:
         anchor_para = meta_para or title_para
@@ -168,7 +176,11 @@ def apply_smart_replacements(
         if parent is not None and body_template is not None and anchor_para is not None:
             heading_style_id = sorted(heading_ids)[0] if heading_ids else None
             _insert_sections_after(
-                index, anchor_para, toc, sections_body, body_template, heading_style_id
+                index,
+                anchor_para,
+                [(toc[k], _body_at(k)) for k in range(len(toc))],
+                body_template,
+                heading_style_id,
             )
 
     last_section_anchor: ET.Element | None = None
@@ -180,10 +192,10 @@ def apply_smart_replacements(
         # Replace heading text with TOC entry
         _normalize_paragraph(sec['heading_p'], section_name)
 
-        # Pull AI body text by INDEX-aligned heading lookup, then by name
-        # (sections_body keys are AI section headings; toc[i] equals the i-th
-        # AI heading because the server passes draft.toc = sections.map(s.heading))
-        ai_body = sections_body.get(section_name, "")
+        # Pull AI body text by INDEX — toc[i] and items[i] come from the same
+        # ordered list (run() derives toc from section_items), so the binding
+        # cannot diverge and duplicate headings keep their own bodies.
+        ai_body = _body_at(i)
         sentences = _split_body_sentences(ai_body)
 
         body_ps = sec['body_ps']
@@ -234,7 +246,7 @@ def apply_smart_replacements(
         last_section_anchor = section_anchor
 
     if len(toc) > len(sections) and sections:
-        remaining = toc[len(sections):]
+        remaining = [(toc[k], _body_at(k)) for k in range(len(sections), len(toc))]
         last_sec = sections[-1]
         anchor_para = last_section_anchor or (last_sec['body_ps'][-1] if last_sec['body_ps'] else last_sec['heading_p'])
         parent = index.parent_of(anchor_para)
@@ -252,7 +264,7 @@ def apply_smart_replacements(
         if parent is not None and body_template is not None:
             heading_style_id = sorted(heading_ids)[0] if heading_ids else None
             _insert_sections_after(
-                index, anchor_para, remaining, sections_body, body_template, heading_style_id
+                index, anchor_para, remaining, body_template, heading_style_id
             )
 
     # ── P0 FIX ─────────────────────────────────────────────────────────────

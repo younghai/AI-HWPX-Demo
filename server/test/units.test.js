@@ -108,6 +108,35 @@ describe('parseSectionsPayload', () => {
     expect(out).toHaveLength(1)
     expect(warnings).toHaveLength(1)
   })
+
+  // ── SPEC-P1b: export 경로도 shared/schema.js 단일 계약을 쓴다 ──────────────
+  it('allows an empty body on export (blanked slot) and preserves the section id', () => {
+    const out = parseSectionsPayload('[{"id":"s1","heading":"h","body":""}]', '[]')
+    expect(out).toEqual([{ id: 's1', heading: 'h', body: '' }])
+  })
+  it('rejects a section without a heading with 422 (was: silently exported)', () => {
+    try {
+      parseSectionsPayload('[{"body":"b"}]', '[]')
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect(e.statusCode).toBe(422)
+      expect(e.message).toMatch(/heading/)
+    }
+  })
+  it('strips unknown keys (e.g. transient editor flags) from sections', () => {
+    const out = parseSectionsPayload('[{"heading":"h","body":"b","regenerating":true}]', '[]')
+    expect(out).toEqual([{ heading: 'h', body: 'b' }])
+  })
+  it('drops invalid diagram entries with the same rule as the generate path', () => {
+    const out = parseSectionsPayload(
+      '[{"heading":"h","body":"b"}]',
+      '[{"type":"nope","data":[]},{"type":"timeline","data":[],"afterSectionId":"s2"}]'
+    )
+    expect(out).toHaveLength(2)
+    expect(out[1].type).toBe('timeline')
+    expect(out[1].afterSectionId).toBe('s2')
+    expect(out[1]._diagram).toBe(true)
+  })
 })
 
 describe('buildHwpx', () => {

@@ -1,56 +1,20 @@
-export class ValidationError extends Error {
-  constructor(message, path) {
-    super(message)
-    this.name = 'ValidationError'
-    this.path = path
-  }
-}
+// 생성(AI 응답) 경로 검증. 섹션/다이어그램 규칙의 단일 출처는 shared/schema.js —
+// 여기서는 draft 봉투(summary + sections + diagrams)만 조립한다.
+import { ValidationError, normalizeSections, normalizeDiagrams } from './schema.js'
 
-function isPlainObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
+// draft.js 등이 `instanceof ValidationError` 로 재시도 여부를 판단하므로
+// 클래스 정체성을 유지한 채 re-export 한다.
+export { ValidationError }
 
 export function validateDraftPayload(raw) {
-  if (!isPlainObject(raw)) {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new ValidationError('AI 응답이 객체 형식이 아닙니다.', '$')
   }
   const summary = typeof raw.summary === 'string' ? raw.summary.trim() : ''
-  if (!Array.isArray(raw.sections) || raw.sections.length === 0) {
-    throw new ValidationError('sections 배열이 비어 있거나 잘못되었습니다.', '$.sections')
-  }
-
-  const sections = raw.sections.map((section, index) => {
-    if (!isPlainObject(section)) {
-      throw new ValidationError(`sections[${index}] 가 객체가 아닙니다.`, `$.sections[${index}]`)
-    }
-    const heading = typeof section.heading === 'string' ? section.heading.trim() : ''
-    const body = typeof section.body === 'string' ? section.body.trim() : ''
-    if (!heading) {
-      throw new ValidationError(`sections[${index}].heading 누락`, `$.sections[${index}].heading`)
-    }
-    if (!body) {
-      throw new ValidationError(`sections[${index}].body 누락`, `$.sections[${index}].body`)
-    }
-    return { heading, body }
-  })
-
-  const rawDiagrams = Array.isArray(raw.diagrams) ? raw.diagrams : []
-  const diagrams = rawDiagrams
-    .map((spec) => normalizeDiagram(spec))
-    .filter(Boolean)
-
+  // AI 는 본문을 반드시 채워야 하므로 requireBody:true (내보내기 경로와의 차이는 이 옵션뿐).
+  const sections = normalizeSections(raw.sections, { requireBody: true })
+  const diagrams = normalizeDiagrams(raw.diagrams)
   return { summary, sections, diagrams }
-}
-
-function normalizeDiagram(spec) {
-  if (!isPlainObject(spec)) return null
-  const type = typeof spec.type === 'string' ? spec.type.trim() : ''
-  if (!['flowchart', 'timeline', 'comparison'].includes(type)) return null
-  const title = typeof spec.title === 'string' ? spec.title.trim() : ''
-  const afterSection = typeof spec.afterSection === 'string' ? spec.afterSection.trim() : ''
-  const data = Array.isArray(spec.data) ? spec.data : []
-  // Combined sections+diagrams magic-key contract is documented in server/lib/sections.js.
-  return { _diagram: true, type, title, afterSection, data }
 }
 
 // Extract the first balanced JSON object from an AI response. Prefers a fenced

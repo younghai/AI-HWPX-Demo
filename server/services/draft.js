@@ -7,6 +7,7 @@ import { mockDraftJson, mockSectionBody } from './mockAi.js'
 import { getValidAccessToken } from '../lib/oauthTokens.js'
 import { record } from '../lib/metrics.js'
 import { buildDocFieldLines, buildPrompt } from './promptBuilder.js'
+import { estimateUsage } from '../lib/usage.js'
 
 // Prefer a valid OAuth access token (refreshed if needed) for OAuth-connected
 // providers, falling back to the static API key. See review BE-05.
@@ -75,8 +76,6 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
 
   let realUsage = null
 
-  // Per-model pricing (USD / 1M tokens) resolved from providers-config.
-  const pricing = { in: chosenModel.priceIn || 0, out: chosenModel.priceOut || 0 }
   const startedAt = Date.now()
   let attempts = 0
   let validated = null
@@ -118,12 +117,14 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
   }
   const elapsedMs = Date.now() - startedAt
   record('ai_draft', { ok: true, ms: elapsedMs })
-  // Prefer provider-reported token counts; fall back to a char-based estimate
-  // (한국어 ≈ 1.5, 영어 ≈ 4 chars/token → conservative /3) when absent (review PO-05).
-  const estInputTokens = realUsage?.inputTokens ?? Math.ceil(prompt.length / 3)
-  const estOutputTokens = realUsage?.outputTokens ?? Math.ceil(lastResponseText.length / 3)
-  const tokensMeasured = Boolean(realUsage)
-  const estCostUsd = (estInputTokens * pricing.in + estOutputTokens * pricing.out) / 1_000_000
+  const usageEstimate = estimateUsage({
+    promptText: prompt,
+    outputText: lastResponseText,
+    usageFromApi: realUsage,
+    priceIn: chosenModel.priceIn || 0,
+    priceOut: chosenModel.priceOut || 0,
+    elapsedMs
+  })
 
   const lines = effectiveText
     .split('\n')
@@ -132,12 +133,12 @@ export async function buildDraftWithAI(input, { onProgress } = {}) {
     .filter((value, index, array) => array.indexOf(value) === index)
 
   const usage = {
-    elapsedMs,
+    elapsedMs: usageEstimate.elapsedMs,
     attempts,
-    estInputTokens,
-    estOutputTokens,
-    tokensMeasured,
-    estCostUsd: Number(estCostUsd.toFixed(4)),
+    estInputTokens: usageEstimate.estInputTokens,
+    estOutputTokens: usageEstimate.estOutputTokens,
+    tokensMeasured: usageEstimate.tokensMeasured,
+    estCostUsd: usageEstimate.estCostUsd,
     provider: provider.label,
     model: chosenModel.id
   }
@@ -266,11 +267,19 @@ export async function buildDraftParallel(input, { onProgress } = {}) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, toc.length) }, worker))
 
   const elapsedMs = Date.now() - startedAt
+  const usageEstimate = estimateUsage({
+    promptText: '',
+    outputText: '',
+    usageFromApi: null,
+    priceIn: chosenModel.priceIn || 0,
+    priceOut: chosenModel.priceOut || 0,
+    elapsedMs
+  })
   record('ai_draft_parallel', { ok: true, ms: elapsedMs })
 
   return {
     usage: {
-      elapsedMs,
+      elapsedMs: usageEstimate.elapsedMs,
       attempts: toc.length,
       provider: provider.label,
       model: chosenModel.id,

@@ -137,6 +137,7 @@ describe('resolveDocFieldValues', () => {
 })
 
 import { buildDocFieldLines, buildPrompt } from '../services/promptBuilder.js'
+import { estimateUsage } from '../lib/usage.js'
 
 describe('promptBuilder', () => {
   it('assembles declared doc field lines and drops unrelated keys', () => {
@@ -179,6 +180,46 @@ describe('promptBuilder', () => {
     expect(prompt).toContain('회의 일시: 2026-07-10 14:00\n참석자: 김대표, 이과장')
     expect(prompt).toHaveLength(1225)
     expect(Buffer.byteLength(prompt, 'utf8')).toBe(2266)
+  })
+})
+
+describe('estimateUsage', () => {
+  it('uses provider-measured tokens when usage is present', () => {
+    const usage = estimateUsage({
+      promptText: 'ignored prompt',
+      outputText: 'ignored output',
+      usageFromApi: { inputTokens: 1200, outputTokens: 345 },
+      priceIn: 3,
+      priceOut: 15,
+      elapsedMs: 98
+    })
+
+    expect(usage).toEqual({
+      elapsedMs: 98,
+      tokensMeasured: true,
+      estInputTokens: 1200,
+      estOutputTokens: 345,
+      estCostUsd: 0.0088
+    })
+  })
+
+  it('estimates tokens from text lengths when provider usage is absent', () => {
+    const usage = estimateUsage({
+      promptText: 'x'.repeat(3001),
+      outputText: 'y'.repeat(1200),
+      usageFromApi: null,
+      priceIn: 3,
+      priceOut: 15,
+      elapsedMs: 500
+    })
+
+    expect(usage).toEqual({
+      elapsedMs: 500,
+      tokensMeasured: false,
+      estInputTokens: 1001,
+      estOutputTokens: 400,
+      estCostUsd: 0.009
+    })
   })
 })
 

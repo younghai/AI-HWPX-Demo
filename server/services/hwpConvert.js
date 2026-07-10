@@ -61,31 +61,40 @@ export function isHwpConverterAvailable() {
   return availability.available
 }
 
-export async function convertHwpToHwpx(inputHwpPath, outDir) {
+// 공용 CLI 실행 (HC-2): 출력 확장자가 방향을 결정한다(.hwpx=변환, .md=추출).
+// runProcess 로 통합(P3-b): timeout→SIGTERM→SIGKILL 상태기계 재구현 제거,
+// converter 도 spawn 슬롯 예산(MAX_WORKER_SPAWNS)에 포함된다.
+// exactEnv — CHILD_ENV_KEYS 화이트리스트를 병합 없이 그대로 전달.
+async function runConverterCli(inputPath, outputPath, label) {
   try {
     if (!isHwpConverterAvailable()) return null
 
-    await fs.mkdir(outDir, { recursive: true })
-    const outputPath = path.join(outDir, `${crypto.randomUUID()}.hwpx`)
+    await fs.mkdir(path.dirname(outputPath), { recursive: true })
     const classPath = [converterJar, converterLibGlob].join(path.delimiter)
-    // runProcess 로 통합(P3-b): timeout→SIGTERM→SIGKILL 상태기계 재구현 제거,
-    // converter 도 spawn 슬롯 예산(MAX_WORKER_SPAWNS)에 포함된다.
-    // exactEnv — CHILD_ENV_KEYS 화이트리스트를 병합 없이 그대로 전달.
     const result = await runProcess(
       JAVA_BIN,
-      ['-Xmx512m', '-cp', classPath, CONVERTER_CLASS, inputHwpPath, outputPath],
+      ['-Xmx512m', '-cp', classPath, CONVERTER_CLASS, inputPath, outputPath],
       repoRoot,
       { timeoutMs: CONVERTER_TIMEOUT_MS, maxOutputBytes: MAX_OUTPUT_CHARS, exactEnv: converterEnv() }
     )
 
     if (!result.ok) {
       await fs.unlink(outputPath).catch(() => {})
-      logger.warn({ reason: result.reason, stderr: stderrSnippet(result.stderr) }, 'hwp converter failed')
+      logger.warn({ reason: result.reason, stderr: stderrSnippet(result.stderr) }, label)
       return null
     }
     return outputPath
   } catch (err) {
-    logger.warn({ err: err?.message }, 'hwp converter failed')
+    logger.warn({ err: err?.message }, label)
     return null
   }
+}
+
+export async function convertHwpToHwpx(inputHwpPath, outDir) {
+  return runConverterCli(inputHwpPath, path.join(outDir, `${crypto.randomUUID()}.hwpx`), 'hwp converter failed')
+}
+
+// HC-2: HWP/HWPX → Markdown 추출 (CtrlTable → GFM 표 보존). 실패/미가용 시 null.
+export async function extractMarkdown(inputPath, outDir) {
+  return runConverterCli(inputPath, path.join(outDir, `${crypto.randomUUID()}.md`), 'hwp markdown extract failed')
 }

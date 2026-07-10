@@ -72,5 +72,6 @@ export const COST_LIMITED_PATHS = [
   '/api/generate-draft/stream',
   '/api/regenerate-section',
   '/api/export-hwpx',
+  '/api/extract',
   '/api/test-provider'
 ]

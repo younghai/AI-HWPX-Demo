@@ -31,6 +31,14 @@ from hwpx.paragraphs import (
     _split_body_sentences,
 )
 from hwpx.eltree import ParentIndex
+from hwpx.fields import (
+    _apply_label_value_fields,
+    _cell_fill_paragraph,
+    _cell_first_text,
+    _match_field,
+    _normalize_field_label,
+)
+from hwpx.io import SectionsParseError, load_doc_fields, load_sections_body
 
 
 TEMPLATES = {
@@ -120,67 +128,6 @@ def _insert_sections_after(
         for sentence in _split_body_sentences(sections_body.get(section_name, "")):
             cur = index.insert_after(cur, _clone_paragraph_for_text(body_template, sentence))
     return cur
-
-
-def _normalize_field_label(text: str) -> str:
-    s = unicodedata.normalize("NFC", text or "").strip()
-    for ch in (":", "：", "·", ".", " "):
-        s = s.replace(ch, "")
-    return s
-
-
-def _match_field(cell_label: str, fields: list[dict]) -> dict | None:
-    cl = _normalize_field_label(cell_label)
-    if len(cl) < 2:
-        return None
-    for field in fields:
-        fl = _normalize_field_label(field.get("label", ""))
-        if len(fl) < 2:
-            continue
-        if cl == fl or cl in fl or fl in cl:
-            return field
-    return None
-
-
-def _cell_first_text(cell: ET.Element) -> str:
-    for t in cell.iter(f"{{{HP}}}t"):
-        if t.text and t.text.strip():
-            return t.text.strip()
-    return ""
-
-
-def _cell_fill_paragraph(cell: ET.Element) -> ET.Element | None:
-    return cell.find(f".//{{{HP}}}p")
-
-
-def _apply_label_value_fields(
-    root: ET.Element, fields: list[dict] | None
-) -> set[ET.Element]:
-    consumed: set[ET.Element] = set()
-    if not fields:
-        return consumed
-
-    for tbl in root.iter(f"{{{HP}}}tbl"):
-        for tr in tbl.findall(f"{{{HP}}}tr"):
-            cells = tr.findall(f"{{{HP}}}tc")
-            if len(cells) < 2:
-                continue
-            for i in range(len(cells) - 1):
-                field = _match_field(_cell_first_text(cells[i]), fields)
-                if field is None:
-                    continue
-                value = field.get("value", "")
-                if not value:
-                    continue
-                value_p = _cell_fill_paragraph(cells[i + 1])
-                if value_p is None:
-                    continue
-                _normalize_paragraph(value_p, value)
-                for cell in (cells[i], cells[i + 1]):
-                    for p in cell.iter(f"{{{HP}}}p"):
-                        consumed.add(p)
-                break
-    return consumed
 
 
 def apply_smart_replacements(
@@ -621,61 +568,6 @@ def embed_diagrams(
     tree.write(section_path, encoding="utf-8", xml_declaration=True)
     hpf_tree.write(content_hpf, encoding="utf-8", xml_declaration=True)
     return report
-
-
-class SectionsParseError(Exception):
-    """Raised when a sections JSON file was provided but could not be parsed.
-
-    Distinct from "no file provided" so the caller can surface a real failure
-    instead of silently generating a document with empty bodies.
-    """
-
-
-def load_sections_body(json_path: str | None) -> tuple[dict[str, str] | None, list[dict]]:
-    """Returns (sections_body_dict, diagrams_list).
-
-    Headings and bodies are NFC-normalized so lookups against the NFC-normalized
-    TOC (see main()) succeed even when the source JSON carries NFD text — which
-    happens on macOS, where filenames and pasted text are NFD by default. Without
-    this, an NFD heading would fail the toc[i] lookup and the section body would
-    be cleared to empty. See CLAUDE.md R6 / review PY-02.
-    """
-    if not json_path:
-        return None, []
-    try:
-        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SectionsParseError(f"sections JSON을 읽을 수 없습니다: {exc}") from exc
-    if not isinstance(data, list):
-        raise SectionsParseError("sections JSON 최상위가 배열이 아닙니다.")
-    sections = {
-        unicodedata.normalize("NFC", s["heading"]): unicodedata.normalize("NFC", s["body"])
-        for s in data
-        if isinstance(s, dict) and "heading" in s and "body" in s
-    }
-    diagrams = [d for d in data if isinstance(d, dict) and d.get("_diagram") is True]
-    return sections, diagrams
-
-
-def load_doc_fields(json_path: str | None) -> list[dict]:
-    if not json_path:
-        return []
-    try:
-        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        logging.warning("load_doc_fields: could not read %s: %s", json_path, exc)
-        return []
-    if not isinstance(data, list):
-        return []
-    out: list[dict] = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        label = unicodedata.normalize("NFC", str(item.get("label", ""))).strip()
-        value = unicodedata.normalize("NFC", str(item.get("value", ""))).strip()
-        if label and value:
-            out.append({"key": str(item.get("key", "")), "label": label, "value": value})
-    return out
 
 
 class TemplateNotFoundError(Exception):

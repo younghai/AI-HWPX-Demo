@@ -31,6 +31,6 @@
 
 ## 진행
 
-- ✅ **P2.3a** — fields.py + io.py (byte-identical, 39 passed).
-- ⏳ P2.3b — diagrams.py (문자열 XML 유지).
-- ⏳ P2.3c — sections.py (classify/map/fill + apply_smart_replacements).
+- ✅ **P2.3a** `a490dc4` — fields.py + io.py (byte-identical, 39 passed).
+- ✅ **P2.3b** `1909484` — diagrams.py (문자열 XML 유지, 다이어그램 embed 경로 byte-identical).
+- ✅ **P2.3c** — sections.py (detect_heading_style_ids + _insert_sections_after + apply_smart_replacements 이동, byte-identical). build_hwpx.py 762→204줄(73%↓). **P2 완료** — hwpx/ 7모듈(namespaces·paragraphs·eltree·fields·io·diagrams·sections).

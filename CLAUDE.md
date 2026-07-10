@@ -25,9 +25,9 @@
 - **실수 이력**: 코드 변경 후 "완료" 선언 → 사용자가 실제로 동작 안 됨 발견 (AI 내용 누락, 글자 겹침, rhwp WASM 에러)
 
 ### R2. 의존성 버전은 pin (`^` 금지, 특히 네이티브 바인딩 있는 패키지)
-- `@rhwp/core` 는 `0.7.2` 로 exact pin (v0.7.3 WASM import 호환성 이슈 있음)
+- `@rhwp/core` 는 **exact pin 유지** (현재 `0.7.17`). 캐럿(`^`) 금지 — 네이티브 WASM 바인딩이라 마이너 업데이트가 import 호환성을 깰 수 있다
 - cairosvg 같은 네이티브 lib 의존 패키지는 `ImportError` + `OSError` 모두 catch
-- **실수 이력**: `^0.7.2` → npm이 0.7.3 자동 설치 → `WebAssembly.instantiate(): function import requires a callable` 에러
+- **실수 이력**: `^0.7.2` → npm이 0.7.3 자동 설치 → `WebAssembly.instantiate(): function import requires a callable` 에러. 그래서 exact pin. 이후 0.7.2→`0.7.17`로 올렸고(여전히 exact, 렌더 정상), 브라우저 실측 통과. **문서에 옛 버전(0.7.2)을 보고 되돌리지 말 것** — package.json의 현재 exact 값이 정본
 
 ### R3. `package.json` 건드렸으면 dev 서버 재시작 + vite cache + 브라우저 하드 리프레시
 - `tools/smoke-test.sh` 로 서버 응답 확인 필수

@@ -1,11 +1,12 @@
 # ADR 0001: `@rhwp/core` 버전 pin
 
-**Status**: Accepted — 2026-04-20
-**Context**: `v2/client/package.json`
+**Status**: Accepted — 2026-04-20 · **Updated 2026-07-10 (현재 pin `0.7.17`)**
+**Context**: `client/package.json`
 
 ## Decision
 
-`@rhwp/core` 는 `"0.7.2"` 로 **exact pin** (caret `^` 금지).
+`@rhwp/core` 는 **exact pin** (caret `^` 금지). **현재 pin: `0.7.17`** (client/package.json 이 정본).
+아래 Rationale의 0.7.2/0.7.3 은 이 결정을 낳은 최초 사고 기록이며, 현재 버전이 아니다.
 
 ## Rationale
 
@@ -33,3 +34,7 @@ rhwp.js 글루와 WASM 바이너리 바인딩 해시 (0.7.3) 는 일치했지만
 3. 브라우저 수동 테스트: 파일 업로드 → 미리보기 → AI 생성 → 다운로드 → 한컴에서 열기
 4. 성공 시 `package.json` 에 exact pin + 이 ADR 업데이트
 5. `docs/lessons-learned.md` 에 경험 기록
+
+## Update Log
+
+- **2026-07-10**: `0.7.2` → `0.7.17` 로 exact pin 승격. 브라우저 실측(샘플→미리보기 3p→AI 생성→빌드→다운로드, 콘솔 에러 0)과 컨테이너 E2E 통과 확인. exact-pin 결정은 유지. (당시 이 ADR 갱신 스텝 4가 누락됐던 것을 리팩토링 감사에서 발견·정정.)

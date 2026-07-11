@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-07-11 — 첫 git push가 HTTP 400 sideband 중단으로 실패 (repo 6.9MiB인데도)
+
+### What happened
+- `git push -u origin phase-abc-2026-07-03` 첫 시도가 `RPC failed; HTTP 400 curl 22` + `unexpected disconnect while reading sideband packet`으로 실패
+
+### Why
+- git은 push 본문이 `http.postBuffer`(기본 1MB)를 넘으면 chunked transfer-encoding으로 전환하는데, 이 환경의 HTTPS 경로가 chunked POST를 400으로 거부 — pack이 1MB만 넘으면 repo가 작아도(6.9MiB) 동일하게 터짐
+
+### Fix
+- `git config http.postBuffer 104857600` (repo-local) 후 재시도 → Content-Length 방식으로 전송돼 성공
+
+### Prevention
+- 이 repo에는 이미 로컬 config로 박아둠. 새 클론에서 같은 증상이 나오면 위 한 줄 먼저 적용
+- 400/sideband 증상을 인증 문제(401/403 아님)나 용량 제한(GitHub 2GB 아님)으로 오진하지 말 것
+
+---
+
 ## 2026-07-06 — golden 러너가 macOS 기본 bash 3.2에서 즉사 (샌드박스 구현자는 못 잡는 부류)
 
 ### What happened

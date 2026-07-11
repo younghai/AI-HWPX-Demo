@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-07-11 — 첫 CI 가동이 11초 만에 EACCES로 즉사 (.npmrc 맥 전용 절대경로)
+
+### What happened
+- GitHub Actions 첫 런이 `pnpm/action-setup` 단계에서 `EACCES: permission denied, mkdir '/Users'`로 실패
+
+### Why
+- 로컬 워크스페이스 정책이 커밋된 `.npmrc`에 `store-dir=/Users/young/.../.pnpm-store`(맥 전용 절대경로)를 넣는데, Linux 러너에는 `/Users`가 없음. action-setup의 self-installer조차 repo `.npmrc`를 읽어서 setup 단계부터 죽음 — 이 repo가 로컬 전용일 때는 무해했지만 공개 repo+CI가 되는 순간 터지는 부류
+
+### Fix
+- ci.yml에 checkout 직후 `.npmrc`를 러너 로컬 store로 덮어쓰는 스텝 추가 (8bbe2a8) — 로컬 정책 파일은 그대로 유지
+
+### Prevention
+- 머신 절대경로가 커밋 파일에 들어가면 "이 repo가 다른 머신에서 돌 때"를 항상 질문할 것
+- 새 프로젝트를 공개/CI로 올릴 때 `.npmrc`·설정 파일의 절대경로 스캔을 선행
+
+---
+
 ## 2026-07-11 — 첫 git push가 HTTP 400 sideband 중단으로 실패 (repo 6.9MiB인데도)
 
 ### What happened

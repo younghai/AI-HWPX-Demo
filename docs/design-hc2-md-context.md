@@ -1,6 +1,9 @@
 # HC-2 설계 노트 — 원문 표 보존 컨텍스트 (HWP/HWPX → Markdown 추출)
 
-> 상태: **설계 확정, 구현 대기(Codex).** 작성: 감사자(계획·감사 lane), 2026-07-11.
+> 상태: **구현 완료 + 검증 통과 (2026-07-11).** 서버 `4a804c4` · 클라 `83f8e91`.
+> Codex 사용량 한도로 감사자가 본 스펙 그대로 직접 구현(사전 확정 스펙 = 작성자/검토자 분리 보완).
+> 검증: 서버 52·클라 43·pytest 45 그린, 호스트 graceful `{ok:false}`+415 실측,
+> 컨테이너 실문서 E2E(HTML table 보존, 200KB 절단 플래그) 통과. 작성: 감사자(계획·감사 lane), 2026-07-11.
 > 전제: HC-1 인프라 재사용 — `vendor/hwpconverter`(Apache-2.0, 9af63ea 고정), `isHwpConverterAvailable()`,
 > P3-b의 `runProcess({ exactEnv, maxOutputBytes })`, #5의 `capabilities.hwpConvert` 노출.
 

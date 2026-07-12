@@ -144,3 +144,11 @@ bash tools/smoke-test.sh         # 정상성 재검증
 
 - 문서 파싱/렌더링: [`@rhwp/core`](https://www.npmjs.com/package/@rhwp/core) (`0.7.17` exact pin — R2 규칙)
 - HWPX 빌더: [`scripts/build_hwpx.py`](./scripts/build_hwpx.py) (repo 내장)
+
+## ⚖️ 라이선스
+
+이 저장소는 [MIT License](./LICENSE)로 배포됩니다.
+
+Docker 이미지에 번들되는 HWP→HWPX 변환기 [vsdn/hwpConverter](https://github.com/vsdn/hwpConverter)는
+**Apache-2.0**이며 별도 고지를 따릅니다 — [`NOTICE`](./NOTICE) 및 이미지 내
+`vendor/hwpconverter/LICENSE-hwpConverter` 참조 (repo에는 소스가 포함되지 않고 빌드 시 지정 커밋을 받아옵니다).

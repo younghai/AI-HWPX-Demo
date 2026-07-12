@@ -10,6 +10,10 @@ client/dist
 .env.*
 server/.env
 
+# Machine-specific pnpm store path — would create a phantom /Users dir in the
+# builder stage (same class as the CI EACCES; see docs/lessons-learned.md)
+.npmrc
+
 # Runtime output / local state
 generated
 .work

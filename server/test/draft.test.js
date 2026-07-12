@@ -111,8 +111,8 @@ describe('mockAi', () => {
   })
 })
 
-// ── parallel section generation spike (C2) ───────────────────────────────────
-import { buildDraftParallel, buildDraftWithAI } from '../services/draft.js'
+// ── draft generation (mock provider) ─────────────────────────────────────────
+import { buildDraftWithAI } from '../services/draft.js'
 
 describe('buildDraftWithAI', () => {
   it('generates a mock-provider draft with existing progress and usage shape', async () => {
@@ -143,26 +143,12 @@ describe('buildDraftWithAI', () => {
   })
 })
 
-describe('buildDraftParallel (C2 spike)', () => {
-  it('generates one section per TOC entry via the demo provider + emits progress', async () => {
-    const phases = []
-    const draft = await buildDraftParallel(
-      { aiProvider: 'mock', docType: 'report', companyName: '테스트', targetTitle: 'T' },
-      { onProgress: (e) => phases.push(e.phase) }
-    )
-    expect(draft.sections.length).toBe(5) // report TOC has 5 headings
-    expect(draft.sections.every((s) => s.heading && s.body)).toBe(true)
-    expect(draft.usage.parallel).toBe(true)
-    expect(phases.filter((p) => p === 'section').length).toBe(5)
-  })
-})
-
 // ── SEC-2: 생성 경로는 요청 body 의 API 키를 받지 않는다 ─────────────────────
 import { AI_PROVIDERS } from '../lib/providers-config.js'
 import { clearOAuthToken } from '../lib/oauthTokens.js'
 
 describe('draft generation — SEC-2 (no request-body API keys)', () => {
-  it('an injected aiApiKey is ignored: with no env/OAuth key both paths fail 401 before any provider call', async () => {
+  it('an injected aiApiKey is ignored: with no env/OAuth key generation fails 401 before any provider call', async () => {
     const envKey = AI_PROVIDERS.anthropic.envKey
     const saved = process.env[envKey]
     delete process.env[envKey]
@@ -170,9 +156,6 @@ describe('draft generation — SEC-2 (no request-body API keys)', () => {
     try {
       await expect(
         buildDraftWithAI({ aiProvider: 'anthropic', aiApiKey: 'sk-injected', sourceText: 'x' })
-      ).rejects.toMatchObject({ statusCode: 401 })
-      await expect(
-        buildDraftParallel({ aiProvider: 'anthropic', aiApiKey: 'sk-injected', sourceText: 'x' })
       ).rejects.toMatchObject({ statusCode: 401 })
     } finally {
       if (saved !== undefined) process.env[envKey] = saved

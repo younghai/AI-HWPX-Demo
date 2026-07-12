@@ -32,9 +32,9 @@
 
 세 생성 함수의 `String(input.x || …).trim()` 22줄을 `normalizeDraftInput` 단일 지점으로(시맨틱 동일). **라우트-경계 DTO 변형은 비채택:** 라우트가 `req.body`를 그대로 서비스에 넘기는 현 구조에서 서비스 진입점 정규화와 방어 커버리지가 동일하고, 서비스 직접 호출(테스트 포함)도 같은 규칙을 타는 장점이 있다.
 
-## A-rec 7 — buildDraftParallel 거취 [처분 기록, 코드 무변경]
+## A-rec 7 — buildDraftParallel 제거 ✅ (2026-07-10 승인·실행)
 
-**권고: 제거.** 근거 — ① 자기 문서로 "strictly lower quality" 실험 스파이크, ② client 가 `parallel:true` 를 보내는 경로가 없어 실사용 0(API 전용 잠재 경로), ③ usage shape 가 본 경로와 상이(감사 A §4). 다만 **기능 삭제는 제품 결정**이므로 코드는 유지하고 결정을 여기 남긴다. 제거 시: `services/draft.js` 의 함수 + `routes/draft.js` 의 `parallel` 분기 + units 테스트 1개.
+**근거** — ① 자기 문서로 "strictly lower quality" 실험 스파이크, ② client 가 `parallel:true` 를 보내는 경로가 없어 실사용 0(API 전용 잠재 경로), ③ usage shape 가 본 경로와 상이(감사 A §4). **실행**: `services/draft.js` 함수(83줄) + `routes/draft.js` stream 분기 + C2 spike 테스트 삭제, SEC-2 테스트는 단일 경로 단언으로 축소. 복원 필요 시 git 이력의 C2 spike 참조.
 
 ## 검증 (공통)
 - server 스위트 GREEN(+ P3-b: 출력 캡·exactEnv 단위 테스트, P3-c: ttlStore 단위 테스트 신규).

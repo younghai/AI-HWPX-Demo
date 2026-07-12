@@ -94,6 +94,10 @@ export async function convertHwpToHwpx(inputHwpPath, outDir) {
   return runConverterCli(inputHwpPath, path.join(outDir, `${crypto.randomUUID()}.hwpx`), 'hwp converter failed')
 }
 
+export async function convertHwpxToHwp(inputHwpxPath, outDir) {
+  return runConverterCli(inputHwpxPath, path.join(outDir, `${crypto.randomUUID()}.hwp`), 'hwpx to hwp failed')
+}
+
 // HC-2: HWP/HWPX → Markdown 추출 (CtrlTable → GFM 표 보존). 실패/미가용 시 null.
 export async function extractMarkdown(inputPath, outDir) {
   return runConverterCli(inputPath, path.join(outDir, `${crypto.randomUUID()}.md`), 'hwp markdown extract failed')

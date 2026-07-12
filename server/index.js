@@ -8,6 +8,7 @@ import providersRouter from './routes/providers.js'
 import draftRouter from './routes/draft.js'
 import exportRouter from './routes/export.js'
 import extractRouter from './routes/extract.js'
+import convertHwpRouter from './routes/convertHwp.js'
 import samplesRouter from './routes/samples.js'
 import historyRouter from './routes/history.js'
 import metricsRouter from './routes/metrics.js'
@@ -48,6 +49,7 @@ app.use(providersRouter)
 app.use(draftRouter)
 app.use(exportRouter)
 app.use(extractRouter)
+app.use(convertHwpRouter)
 app.use(samplesRouter)
 app.use(historyRouter)
 app.use(metricsRouter)

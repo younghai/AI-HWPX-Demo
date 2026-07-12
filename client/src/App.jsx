@@ -108,8 +108,10 @@ export default function App() {
           onGenerate={flow.handleGenerate}
           onDownload={flow.handleDownload}
           onDownloadPdf={flow.handleDownloadPdf}
+          onDownloadHwp={flow.handleDownloadHwp}
           canDownloadPdf={rhwp.builtPreview.svgs.length > 0}
           pdfBusy={flow.pdfBusy}
+          hwpBusy={flow.hwpBusy}
           draftLoading={draftApi.draftLoading}
           exportState={draftApi.exportState}
           hasDraft={Boolean(draftApi.draft)}

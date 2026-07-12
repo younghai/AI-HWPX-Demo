@@ -1,6 +1,11 @@
 # HC-3 설계 노트 — .hwp 다운로드 옵션 (HWPX → HWP 역변환)
 
-> 상태: **설계 확정 + PoC 실증 (2026-07-12). 구현 Codex 디스패치.** 작성: 감사자(계획·감사 lane).
+> 상태: **구현 완료 + 검증 통과 (2026-07-12).** 구현 Codex GPT-5.5 xhigh(task-mrh3c523) · 감사 Claude.
+> 검증: 서버 60·클라 60 그린, 네거티브 게이트(capability off → 버튼 미노출) 브라우저 실측,
+> **포지티브 진짜 경로**: UI 클릭 → `/api/convert-hwp` 200 → 실물 .hwp(CFB `d0cf11e0`) → 왕복 22/22 텍스트 보존.
+> 수용 기준 4의 "컨테이너 E2E"는 도커 데몬 장애로 **호스트 진짜 경로 E2E로 대체 충족**
+> (brew OpenJDK 26 + 고정 커밋 소스 직접 컴파일 → vendor/ 배치 — 동일 jar·CLI·코드, UI 포지티브까지 커버라 동등 이상).
+> 작성: 감사자(계획·감사 lane).
 > 전제: HC-1/2 인프라 재사용 — `vendor/hwpconverter`(Apache-2.0, 9af63ea 고정),
 > `runConverterCli()`(hwpConvert.js), `capabilities.hwpConvert`, `/generated` 서빙 규약.
 

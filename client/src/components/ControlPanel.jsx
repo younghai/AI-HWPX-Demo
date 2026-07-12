@@ -18,6 +18,7 @@ export function ControlPanel({
   hwpConvertAvailable = false,
   onGenerate, onDownload,
   onDownloadPdf, canDownloadPdf, pdfBusy,
+  onDownloadHwp, hwpBusy,
   draftLoading, exportState, hasDraft, usingDemo,
   parseStatus
 }) {
@@ -144,6 +145,11 @@ export function ControlPanel({
           <button className="secondary-button" type="button" onClick={onDownload} disabled={!exportState.url || exportState.loading}>
             HWPX 다운로드
           </button>
+          {hwpConvertAvailable && exportState.url && (
+            <button className="secondary-button" type="button" onClick={onDownloadHwp} disabled={hwpBusy}>
+              {hwpBusy ? 'HWP 변환 중…' : 'HWP로 받기'}
+            </button>
+          )}
         </div>
         {canDownloadPdf && (
           <button className="secondary-button pdf-button" type="button" onClick={onDownloadPdf} disabled={pdfBusy}>

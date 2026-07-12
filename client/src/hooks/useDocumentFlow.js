@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { diagramReportFeedback, usageMessage, validationFeedback } from '../lib/feedback.js'
+import { triggerDownload } from '../lib/helpers.js'
+import { requestHwpConversion } from '../lib/convertHwp.js'
 
 function scrollToPreview(previewPanelRef) {
   requestAnimationFrame(() => {
@@ -18,6 +20,7 @@ export function useDocumentFlow({ rhwp, draftApi, toast, providersInfo, previewP
   const [stage, setStage] = useState('idle')
   const [editing, setEditing] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [hwpBusy, setHwpBusy] = useState(false)
 
   function draftContext() {
     return {
@@ -43,12 +46,14 @@ export function useDocumentFlow({ rhwp, draftApi, toast, providersInfo, previewP
     setEditing(false)
     if (!file) {
       form.setSourceFile(null)
+      draftApi.cancelAll()
       draftApi.setDraft(null)
       rhwp.clearBuiltPreview()
       rhwp.setParseStatus('업로드한 문서를 분석하면 여기 상태가 표시됩니다.')
       return
     }
     form.setSourceFile(file)
+    draftApi.cancelAll()
     draftApi.setDraft(null)
     rhwp.clearBuiltPreview()
     // HC-2: 변환기 가용 시 서버 MD 추출로 표 구조 보존 원문을 채택 (실패=flat 폴백)
@@ -158,10 +163,29 @@ export function useDocumentFlow({ rhwp, draftApi, toast, providersInfo, previewP
     }
   }
 
+  async function handleDownloadHwp() {
+    if (hwpBusy || !draftApi.exportState.fileName) return
+    setHwpBusy(true)
+    try {
+      const result = await requestHwpConversion(draftApi.exportState.fileName)
+      if (result?.ok && result.downloadUrl) {
+        triggerDownload(result.downloadUrl, result.fileName)
+        toast.success('구버전 호환용 HWP 변환본을 내려받았습니다. 미리보기와 동일한 원본은 HWPX입니다.')
+      } else {
+        toast.error('HWP 변환에 실패했습니다. HWPX 다운로드를 이용해 주세요.')
+      }
+    } catch {
+      toast.error('HWP 변환에 실패했습니다. HWPX 다운로드를 이용해 주세요.')
+    } finally {
+      setHwpBusy(false)
+    }
+  }
+
   return {
     stage,
     editing,
     pdfBusy,
+    hwpBusy,
     showEmptyState: !form.sourceFile && !draftApi.draft && !rhwp.builtPreview.svgs.length,
     showEditor: Boolean(draftApi.draft) && (editing || !rhwp.builtPreview.svgs.length),
     handleCancel,
@@ -171,6 +195,7 @@ export function useDocumentFlow({ rhwp, draftApi, toast, providersInfo, previewP
     handleBuild,
     handleDownload: draftApi.downloadBuilt,
     handleDownloadPdf,
+    handleDownloadHwp,
     handleRegenerateSection,
     handleEditAgain
   }

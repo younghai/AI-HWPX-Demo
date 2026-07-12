@@ -1,16 +1,17 @@
-<!-- 제안 제목 (gh pr create --title 에 사용):
-     feat: Phase ABC — AI HWP 기능 확장(A~D · HC-1/2) + 리팩토링(P1~P3) + 보안 하드닝(P6) -->
+# Release Notes — Phase ABC (2026-07-03 ~ 2026-07-12)
 
-## 요약
+> 원래 PR 설명 초안으로 작성됐으나, main을 로컬 fast-forward로 동기화하면서
+> 사이클 릴리스 노트로 전환. `main`에 이미 반영 완료된 내용의 기록이다.
 
-`phase-abc-2026-07-03` 개발 사이클 전체를 `main`에 반영합니다. 온보딩/데모(A),
-생성 UX(B), 문서 품질·표 셀 치환(C), 다이어그램 품질(D), HWP→HWPX 변환(HC-1),
+`phase-abc-2026-07-03` 개발 사이클 전체입니다. 온보딩/데모(A), 생성 UX(B),
+문서 품질·표 셀 치환(C), 다이어그램 품질(D), HWP→HWPX 변환(HC-1),
 표 보존 원문 컨텍스트(HC-2) 기능과, 이를 지탱하는 `scripts/hwpx/` 패키지·클라이언트
-훅·서버 lib 리팩토링(P1~P3), 보안 하드닝(P6: 토큰 스코핑·주입 채널 제거·CSP)이 포함됩니다.
+훅·서버 lib 리팩토링(P1~P4), 보안 하드닝(P6: 토큰 스코핑·주입 채널 제거·CSP)이 포함됩니다.
+사이클 말미에 GitHub 공개(MIT), CI 가동, 첫 그린 파이프라인까지 완료했습니다.
 
-- **base:** `main` (`8959d80`)
-- **head:** `phase-abc-2026-07-03` (`83f8e91` + 본 문서 커밋)
-- **규모:** 72 commits · 127 files · **+6,683 / −1,875** (코드 기준, 본 문서 제외)
+- **base:** `8959d80` (사이클 시작 시점의 main)
+- **기준 커밋:** `a6461b4` (+ 본 노트 커밋)
+- **규모:** 81 commits · 135 files · **+7,038 / −1,916**
 
 ## 주요 변경
 
@@ -32,7 +33,9 @@
   픽스처 `testdata/minutes-form.hwpx`(결정적 생성기 `scripts/gen_table_fixture.py`) +
   골든 테스트 `scripts/tests/test_table_cell_fill.py`. 회귀 가드
   `test_table_structure_survives_build` 유지.
-- **C2** 섹션 병렬 생성 spike(실험적, opt-in)
+- **C2** 섹션 병렬 생성 spike(실험적, opt-in) — 실험 결과 품질 열위(요약·다이어그램·
+  전역 중복제거 누락)와 실사용 경로 0으로 **사이클 내 제거**(`9f98896`, spec-12 A-rec 7).
+  복원 필요 시 git 이력 참조.
 - **C3** PDF 동시 출력(미리보기 기준, 클라이언트 렌더링)
 - **C4** 품질 KPI — 편집율 + 섹션 재생성율(`/api/metrics`)
 
@@ -55,7 +58,7 @@
   실패 시 rhwp flat 텍스트 유지 — 회귀 0 원칙. 미리보기 렌더에는 관여하지 않음.
 - 원문 문자 예산(12,000자)을 `lib/extractText.js` 단일출처로 통일.
 
-### 리팩토링 (P1~P3)
+### 리팩토링 (P1~P4)
 - **P2** `scripts/hwpx/` 패키지 추출: `namespaces`·`paragraphs`·`fields`·`io`·
   `diagrams`·`sections`, `parent_of` → `ParentIndex` 캡슐화, `build_hwpx.py` 슬림화
 - **P1** 클라이언트 `useDocumentFlow` 훅으로 오케스트레이션 분리(App은 조합만),
@@ -64,6 +67,8 @@
 - **P3** 서버 정리: `lib/paths.js` 경로 단일출처, `runProcess` 확장(`exactEnv`
   화이트리스트·`maxOutputBytes`·구조화 `reason`), 세션 TTL 스토어 추출,
   OAuth 팝업 페이지 분리, `index.js` 라우터 장착 전용(~30줄), draft 입력 정규화 수렴
+- **P4** `useDraft` 다이어트(359→217줄): autosave/SSE 스트림/export FormData 조립을
+  `lib/draftAutosave·draftStream·exportForm`으로 추출 — 행위 보존, 계약 고정 테스트 13개 동반
 - toc를 sections에서 파생 — client→server→python 왕복 제거
 - 서버 테스트 4분할(`upload-sections`/`draft`/`security-session`/`infra`) — 주제별 파일
 
@@ -81,21 +86,21 @@
 - diagram embed + docFields golden 커버리지, minutes 픽스처 정리
 - 산출물 무결성(INV) 배치 — 미리보기==다운로드 불변식 관련 정합 수정
 
-## 테스트
+## 테스트 (기준 커밋 시점 실측)
 
 - **Python** `pytest scripts/tests/` → **45 passed** (C1 골든 + 표 구조 회귀 가드 + 템플릿 위생 포함)
-- **서버** `pnpm -C server test` → **52 passed** (5개 주제 파일)
-- **클라이언트** `pnpm -C client test` → **43 passed** (6개 파일) + 프로덕션 빌드 정상, ESLint 0
+- **서버** `pnpm -C server test` → **51 passed** (주제별 5파일; C2 spike 테스트 제거 반영)
+- **클라이언트** `pnpm -C client test` → **56 passed** (9개 파일) + 프로덕션 빌드 정상, ESLint 0
 - **골든 러너** 3/3 (host; 04 HWP 변환 케이스는 JRE 환경 전용 — 컨테이너 E2E로 검증)
+- **CI** (GitHub Actions, ubuntu): lint → client/server 테스트 → 빌드 → syntax → pytest 전 단계 그린
 
 ## 리뷰 포인트 / 주의
 
 - **미리보기 == 다운로드** 불변식과 R5(단락 정규화)/R6(N섹션↔N슬롯)이 얽힌
   `scripts/hwpx/` 가 핵심. C1은 매칭된 셀만 분류에서 제외하고, 매칭 실패 시 완전 no-op.
-- C2(병렬 생성)는 실험적·opt-in — 품질(요약/다이어그램/전역 중복제거) 트레이드오프 존재.
 - HC-1/HC-2 변환·추출은 JRE 스테이지가 필요(Docker). 로컬 미설치 시 graceful degradation
   (HC-2는 `{ok:false}` → 클라 flat 폴백, 기능 회귀 없음).
-- 커밋이 72개로 많음 — 리뷰는 위 그룹(A/B/C/D/HC/P/보안) 단위로 나눠 보는 것을 권장.
+- 커밋이 81개로 많음 — 리뷰는 위 그룹(A/B/C/D/HC/P/보안) 단위로 나눠 보는 것을 권장.
 
 ## 검증 현황
 
@@ -106,5 +111,7 @@
 - 컨테이너 E2E(docker cp+exec): HC-1 변환 경로(마커 주입·이미지 8개 보존·validator 0),
   HC-2 실문서 추출(`capabilities.hwpConvert: true`, HTML table 보존 markdown,
   200KB 절단 플래그) 통과.
+- 인프라: GitHub 공개 백업(main=phase-abc, 옛 프로토타입은 `legacy-php-prototype` 보존),
+  CI 그린, Docker 빌더 `.npmrc` 제외 후 팬텀 경로 소멸 실측.
 - 남은 수동 확인: docFields UI 타이핑 플로우(양식 업로드 → 일시/참석자 직접 입력 → 다운로드)
   1회 — 동일 경로의 API 레벨 검증은 완료된 상태.

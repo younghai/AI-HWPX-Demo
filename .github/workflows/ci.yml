@@ -9,23 +9,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 커밋된 .npmrc의 store-dir은 로컬 워크스페이스 공유 경로(/Users/...)라
       # Linux 러너에서 EACCES — CI에서는 러너 로컬 store로 교체한다.
       - name: Use runner-local pnpm store
         run: echo "store-dir=$HOME/.pnpm-store" > .npmrc
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.32.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
